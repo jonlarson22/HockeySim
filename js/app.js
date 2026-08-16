@@ -19,8 +19,8 @@ const teamInfoDiv = document.getElementById('team-info');
 const allViews = document.querySelectorAll('.view');
 
 // --- COACH CREATION LOGIC ---
-const STARTING_POINTS = 3;
-let availablePoints = STARTING_POINTS;
+const STARTING_POINTS = 50;
+const MAX_SKILL = 100;
 
 // Temporary object to hold skills before submitting
 const tempSkills = {
@@ -33,24 +33,61 @@ const tempSkills = {
 
 // Grab skill UI elements
 const pointsDisplay = document.getElementById('points-remaining');
+const skillInputs = document.querySelectorAll('.skill-input');
 const plusButtons = document.querySelectorAll('.btn-skill-plus');
 const minusButtons = document.querySelectorAll('.btn-skill-minus');
 
+// Helper function to calculate currently spent points
+function getSpentPoints() {
+    return Object.values(tempSkills).reduce((sum, val) => sum + val, 0);
+}
+
 // Function to update the screen numbers
 function updateSkillUI() {
-    pointsDisplay.textContent = availablePoints;
+    const spent = getSpentPoints();
+    const available = STARTING_POINTS - spent;
+    
+    pointsDisplay.textContent = available;
+    
+    // Sync the input boxes with our data object
     for (const [skill, val] of Object.entries(tempSkills)) {
-        document.getElementById(`skill-val-${skill}`).textContent = val;
+        document.getElementById(`skill-val-${skill}`).value = val;
     }
 }
+
+// Handle Direct Typing into the Input Box
+skillInputs.forEach(input => {
+    input.addEventListener('change', (e) => {
+        const skill = e.target.dataset.skill;
+        let newValue = parseInt(e.target.value) || 0;
+        
+        // Prevent negative numbers
+        if (newValue < 0) newValue = 0;
+        
+        // Temporarily set the skill to 0 to see how many points we have to spend
+        const previousValue = tempSkills[skill];
+        tempSkills[skill] = 0; 
+        const availableNow = STARTING_POINTS - getSpentPoints();
+        
+        // Cap the input so they can't type 999 and break the limit
+        if (newValue > availableNow) {
+            newValue = availableNow;
+        }
+        if (newValue > MAX_SKILL) {
+            newValue = MAX_SKILL;
+        }
+        
+        tempSkills[skill] = newValue;
+        updateSkillUI();
+    });
+});
 
 // Plus Button Listeners
 plusButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
         const skill = e.target.dataset.skill;
-        if (availablePoints > 0) {
+        if (getSpentPoints() < STARTING_POINTS && tempSkills[skill] < MAX_SKILL) {
             tempSkills[skill]++;
-            availablePoints--;
             updateSkillUI();
         }
     });
@@ -62,9 +99,8 @@ minusButtons.forEach(btn => {
         const skill = e.target.dataset.skill;
         if (tempSkills[skill] > 0) {
             tempSkills[skill]--;
-            availablePoints++;
             updateSkillUI();
-        }
+            }
     });
 });
 
@@ -98,12 +134,9 @@ btnNewGame.addEventListener('click', () => {
 
 // 2. Coach Creation -> Job Board
 btnSubmitCoach.addEventListener('click', () => {
-    // Save input values to state
     gameState.coach.firstName = document.getElementById('coach-first').value || "Coach";
     gameState.coach.lastName = document.getElementById('coach-last').value || "Unknown";
     gameState.coach.age = parseInt(document.getElementById('coach-age').value);
-    
-    // Copy the distributed skills into the permanent gameState
     gameState.coach.skills = { ...tempSkills };
 
     generateJobBoard();
@@ -114,21 +147,29 @@ btnSubmitCoach.addEventListener('click', () => {
 function generateJobBoard() {
     jobList.innerHTML = ""; // Clear list
     
-    // For now, let's just filter for Tier 3 teams (Mountain West) as starting jobs
-    const availableJobs = teams.filter(t => t.confId === "conf_mw");
+    // 1. Filter for bottom tier teams (Tier 3 / Mountain West)
+    let availableJobs = teams.filter(t => t.confId === "conf_mw");
 
-    availableJobs.forEach(team => {
+    // 2. Shuffle the array to randomize (Fisher-Yates shuffle approach)
+    availableJobs = availableJobs.sort(() => 0.5 - Math.random());
+
+    // 3. Select 2 or 3 random open jobs
+    // Randomly decide if there are 2 or 3 jobs open this year
+    const numberOfJobs = Math.floor(Math.random() * 2) + 2; 
+    const openJobs = availableJobs.slice(0, numberOfJobs);
+
+    openJobs.forEach(team => {
         const li = document.createElement('li');
         li.className = 'job-item';
         li.innerHTML = `
             <div>
                 <strong>${team.name}</strong><br>
-                <small>Prestige: ${team.prestige}</small>
+                <small>Prestige: ${team.prestige} / 100</small>
             </div>
-            <button style="width: auto; margin: 0; padding: 8px 12px; background: ${team.color}">Accept</button>
+            <button style="width: auto; margin: 0; padding: 8px 12px; background: ${team.color}">Accept Offer</button>
         `;
 
-        // 4. Job Board -> In-Season Dashboard
+        // Accept job click listener
         li.querySelector('button').addEventListener('click', () => {
             acceptJob(team);
         });
