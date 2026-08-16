@@ -1,4 +1,5 @@
 import { teams, conferences, getRandomName } from './data.js';
+import { generateTeamRoster } from './engine.js';
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
@@ -182,12 +183,15 @@ function generateJobBoard() {
 function acceptJob(team) {
     gameState.teamId = team.id;
     
+    // Generate the roster based on the team's prestige rating
+    gameState.roster = generateTeamRoster(team.prestige);
+    
     // Update Header
     teamInfoDiv.textContent = `${gameState.coach.lastName} | ${team.name} HC`;
     teamInfoDiv.style.color = team.color;
 
-    initDashboard(); // Initialize the dashboard data
-    switchView('view-dashboard'); // Move to the dashboard screen
+    initDashboard(); 
+    switchView('view-dashboard');
 }
 
 // --- DASHBOARD LOGIC ---
