@@ -122,3 +122,52 @@ li {
 .job-item:hover {
     border-left: 4px solid #fff;
 }
+
+/* --- Coach Creation Skill Tree --- */
+.skills-container {
+    background-color: #222;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #333;
+}
+
+.skills-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid #444;
+    margin-bottom: 15px;
+}
+
+.skill-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.skill-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Override the default button styles for the small + / - buttons */
+.skill-controls button {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin: 0;
+    font-size: 1.2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.skill-value {
+    font-weight: bold;
+    font-size: 1.2rem;
+    width: 20px;
+    text-align: center;
+}
