@@ -1,1 +1,27 @@
-<script type="module" src="js/app.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>College Hockey Dynasty</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>College Hockey Dynasty</h1>
+        <div id="team-info" class="team-badge">Loading...</div>
+    </header>
+
+    <main>
+        <section class="dashboard-panel">
+            <h2>Recruiting Hub (Test)</h2>
+            <p>Click below to procedurally generate a prospect from data.js.</p>
+            <button id="generate-btn">Scout New Prospect</button>
+            <ul id="prospect-list"></ul>
+        </section>
+    </main>
+
+    <!-- The type="module" allows us to use ES6 imports in app.js -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
