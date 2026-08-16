@@ -41,7 +41,7 @@
                 <div class="skills-container">
                     <div class="skills-header">
                         <h3>Coaching Style (0-100)</h3>
-                        <p>Unassigned Points: <span id="points-remaining" style="color: var(--accent); font-weight: bold;">50</span></p>
+                        <p>Unassigned Points: <span id="points-remaining" style="color: var(--accent); font-weight: bold;">5</span></p>
                     </div>
 
                     <!-- Scouting -->
@@ -49,7 +49,7 @@
                         <span>Scouting Network</span>
                         <div class="skill-controls">
                             <button class="btn-skill-minus secondary" data-skill="scouting">-</button>
-                            <input type="number" id="skill-val-scouting" class="skill-input" data-skill="scouting" value="0" min="0" max="100">
+                            <input type="number" id="skill-val-scouting" class="skill-input" data-skill="scouting" value="3" min="3" max="30">
                             <button class="btn-skill-plus secondary" data-skill="scouting">+</button>
                         </div>
                     </div>
@@ -59,7 +59,7 @@
                         <span>Recruiting Prowess</span>
                         <div class="skill-controls">
                             <button class="btn-skill-minus secondary" data-skill="recruiting">-</button>
-                            <input type="number" id="skill-val-recruiting" class="skill-input" data-skill="recruiting" value="0" min="0" max="100">
+                            <input type="number" id="skill-val-recruiting" class="skill-input" data-skill="recruiting" value="3" min="3" max="30">
                             <button class="btn-skill-plus secondary" data-skill="recruiting">+</button>
                         </div>
                     </div>
@@ -69,7 +69,7 @@
                         <span>Player Development</span>
                         <div class="skill-controls">
                             <button class="btn-skill-minus secondary" data-skill="development">-</button>
-                            <input type="number" id="skill-val-development" class="skill-input" data-skill="development" value="0" min="0" max="100">
+                            <input type="number" id="skill-val-development" class="skill-input" data-skill="development" value="3" min="3" max="30">
                             <button class="btn-skill-plus secondary" data-skill="development">+</button>
                         </div>
                     </div>
@@ -79,7 +79,7 @@
                         <span>Offensive Tactics</span>
                         <div class="skill-controls">
                             <button class="btn-skill-minus secondary" data-skill="offense">-</button>
-                            <input type="number" id="skill-val-offense" class="skill-input" data-skill="offense" value="0" min="0" max="100">
+                            <input type="number" id="skill-val-offense" class="skill-input" data-skill="offense" value="3" min="3" max="30">
                             <button class="btn-skill-plus secondary" data-skill="offense">+</button>
                         </div>
                     </div>
@@ -89,7 +89,7 @@
                         <span>Defensive Tactics</span>
                         <div class="skill-controls">
                             <button class="btn-skill-minus secondary" data-skill="defense">-</button>
-                            <input type="number" id="skill-val-defense" class="skill-input" data-skill="defense" value="0" min="0" max="100">
+                            <input type="number" id="skill-val-defense" class="skill-input" data-skill="defense" value="3" min="3" max="30">
                             <button class="btn-skill-plus secondary" data-skill="defense">+</button>
                         </div>
                     </div>
@@ -112,13 +112,54 @@
 
         <!-- 4. IN-SEASON DASHBOARD SCREEN -->
         <section id="view-dashboard" class="view hidden">
-            <div class="dashboard-panel">
-                <h2>Team Dashboard</h2>
-                <p>Welcome to the season.</p>
-                <!-- Temporary buttons to show future layout -->
-                <button class="menu-btn">View Roster</button>
-                <button class="menu-btn">View Schedule</button>
-                <button class="menu-btn">Advance Week</button>
+            <div class="dashboard-grid">
+                
+                <!-- Left Column: Immediate Actions -->
+                <div class="dash-col">
+                    <div class="dashboard-panel">
+                        <h2>Next Game</h2>
+                        <p id="next-game-info">Week 1 vs. TBA</p>
+                        <button id="btn-play-game">Play Match</button>
+                        <button id="btn-sim-week" class="secondary">Simulate Week</button>
+                    </div>
+
+                    <div class="dashboard-panel">
+                        <h2>Team Management</h2>
+                        <button id="btn-view-roster" class="secondary">View Roster</button>
+                        <button id="btn-coach-tree" class="secondary">Coach Profile</button>
+                    </div>
+                </div>
+
+                <!-- Right Column: League Context -->
+                <div class="dash-col">
+                    <div class="dashboard-panel">
+                        <h2>National Top 25</h2>
+                        <ul id="national-rankings" class="ranking-list">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="dashboard-panel">
+                        <h2>Conference Standings</h2>
+                        <select id="conference-select" class="input-field">
+                            <!-- Populated by JS -->
+                        </select>
+                        <table id="conference-table" class="standings-table">
+                            <thead>
+                                <tr>
+                                    <th>Team</th>
+                                    <th>W</th>
+                                    <th>L</th>
+                                    <th>PTS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="standings-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </section>
     </main>
