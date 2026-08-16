@@ -1,37 +1,99 @@
-// 1. Import our data and functions from data.js
-import { teams, getRandomName } from './data.js';
+import { teams } from './data.js';
 
-// 2. Grab the UI elements from the HTML
+// --- GAME STATE ---
+// This object will eventually be saved to localStorage
+let gameState = {
+    coach: {
+        firstName: "",
+        lastName: "",
+        age: 35,
+        skills: {}
+    },
+    teamId: null,
+    year: 2026
+};
+
+// --- DOM ELEMENTS ---
+const header = document.getElementById('main-header');
 const teamInfoDiv = document.getElementById('team-info');
-const generateBtn = document.getElementById('generate-btn');
-const prospectList = document.getElementById('prospect-list');
+const allViews = document.querySelectorAll('.view');
 
-// 3. Set up a test state
-// Let's set your starting team to the Utah Summit
-const myTeam = teams.find(t => t.id === "team_uta");
+// Buttons
+const btnNewGame = document.getElementById('btn-new-game');
+const btnSubmitCoach = document.getElementById('btn-submit-coach');
+const jobList = document.getElementById('job-list');
 
-function initUI() {
-    // Inject the team name and color into the header
-    teamInfoDiv.textContent = `Head Coach | ${myTeam.name}`;
-    teamInfoDiv.style.color = myTeam.color;
+// --- VIEW ROUTER ---
+function switchView(viewId) {
+    // 1. Hide all screens
+    allViews.forEach(view => view.classList.add('hidden'));
+    
+    // 2. Show the requested screen
+    document.getElementById(viewId).classList.remove('hidden');
+    
+    // 3. Special Header Logic (Hide header on main menu & creation screens)
+    if (viewId === 'view-main-menu' || viewId === 'view-coach-creation') {
+        header.classList.add('hidden');
+    } else {
+        header.classList.remove('hidden');
+    }
 }
 
-// 4. Create a function to test the generation logic
-function handleGenerateClick() {
-    // Generate a new name from the data.js arrays
-    const newName = getRandomName();
+// --- SCREEN LOGIC & EVENT LISTENERS ---
+
+// 1. Main Menu -> Coach Creation
+btnNewGame.addEventListener('click', () => {
+    switchView('view-coach-creation');
+});
+
+// 2. Coach Creation -> Job Board
+btnSubmitCoach.addEventListener('click', () => {
+    // Save input values to state
+    gameState.coach.firstName = document.getElementById('coach-first').value || "Coach";
+    gameState.coach.lastName = document.getElementById('coach-last').value || "Unknown";
+    gameState.coach.age = parseInt(document.getElementById('coach-age').value);
+
+    generateJobBoard();
+    switchView('view-job-board');
+});
+
+// 3. Generate Job Board
+function generateJobBoard() {
+    jobList.innerHTML = ""; // Clear list
     
-    // Create a new list item and add it to the screen
-    const li = document.createElement('li');
-    li.textContent = `Scouted: ${newName}`;
-    
-    // Add it to the top of the list
-    prospectList.prepend(li);
+    // For now, let's just filter for Tier 3 teams (Mountain West) as starting jobs
+    const availableJobs = teams.filter(t => t.confId === "conf_mw");
+
+    availableJobs.forEach(team => {
+        const li = document.createElement('li');
+        li.className = 'job-item';
+        li.innerHTML = `
+            <div>
+                <strong>${team.name}</strong><br>
+                <small>Prestige: ${team.prestige}</small>
+            </div>
+            <button style="width: auto; margin: 0; padding: 8px 12px; background: ${team.color}">Accept</button>
+        `;
+
+        // 4. Job Board -> In-Season Dashboard
+        li.querySelector('button').addEventListener('click', () => {
+            acceptJob(team);
+        });
+
+        jobList.appendChild(li);
+    });
 }
 
-// 5. Wire up the button click event
-generateBtn.addEventListener('click', handleGenerateClick);
+function acceptJob(team) {
+    gameState.teamId = team.id;
+    
+    // Update Header
+    teamInfoDiv.textContent = `${gameState.coach.lastName} | ${team.name} HC`;
+    teamInfoDiv.style.color = team.color;
 
-// 6. Boot up the app
-initUI();
-console.log("App initialized. data.js successfully imported.");
+    // Move to dashboard
+    switchView('view-dashboard');
+}
+
+// Boot up app on the Main Menu
+switchView('view-main-menu');
