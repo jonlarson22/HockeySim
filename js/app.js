@@ -19,16 +19,17 @@ const teamInfoDiv = document.getElementById('team-info');
 const allViews = document.querySelectorAll('.view');
 
 // --- COACH CREATION LOGIC ---
-const STARTING_POINTS = 50;
-const MAX_SKILL = 100;
+const STARTING_POINTS = 5;
+const MAX_SKILL = 30;
+const BASE_SKILL = 3;
 
 // Temporary object to hold skills before submitting
 const tempSkills = {
-    scouting: 0,
-    recruiting: 0,
-    development: 0,
-    offense: 0,
-    defense: 0
+    scouting: BASE_SKILL,
+    recruiting: BASE_SKILL,
+    development: BASE_SKILL,
+    offense: BASE_SKILL,
+    defense: BASE_SKILL
 };
 
 // Grab skill UI elements
