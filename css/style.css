@@ -79,3 +79,46 @@ li {
     font-family: monospace;
     font-size: 1.1rem;
 }
+
+/* --- UI Framework Styles --- */
+
+/* The magic class that hides screens */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.input-field {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 4px;
+    box-sizing: border-box; /* Ensures padding doesn't break width */
+}
+
+.secondary {
+    background-color: #444;
+}
+
+.secondary:hover {
+    background-color: #555;
+}
+
+/* Job listing items */
+.job-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.job-item:hover {
+    border-left: 4px solid #fff;
+}
