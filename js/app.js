@@ -1,4 +1,4 @@
-import { teams } from './data.js';
+import { teams, conferences, getRandomName } from './data.js';
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
@@ -186,8 +186,79 @@ function acceptJob(team) {
     teamInfoDiv.textContent = `${gameState.coach.lastName} | ${team.name} HC`;
     teamInfoDiv.style.color = team.color;
 
-    // Move to dashboard
-    switchView('view-dashboard');
+    initDashboard(); // Initialize the dashboard data
+    switchView('view-dashboard'); // Move to the dashboard screen
+}
+
+// --- DASHBOARD LOGIC ---
+function initDashboard() {
+    populateConferenceDropdown();
+    updateStandingsTable(conferences[0].id); // Default to the first conference
+    updateTop25();
+}
+
+function populateConferenceDropdown() {
+    const select = document.getElementById('conference-select');
+    select.innerHTML = "";
+    
+    conferences.forEach(conf => {
+        const option = document.createElement('option');
+        option.value = conf.id;
+        option.textContent = conf.name;
+        select.appendChild(option);
+    });
+
+    // Listen for dropdown changes
+    select.addEventListener('change', (e) => {
+        updateStandingsTable(e.target.value);
+    });
+}
+
+function updateStandingsTable(confId) {
+    const tbody = document.getElementById('standings-body');
+    tbody.innerHTML = "";
+
+    // Filter teams by conference, then sort by prestige (as a mock for wins for now)
+    const confTeams = teams.filter(t => t.confId === confId)
+                           .sort((a, b) => b.prestige - a.prestige);
+
+    confTeams.forEach(team => {
+        const row = document.createElement('tr');
+        // If it's the user's team, highlight it
+        if(team.id === gameState.teamId) {
+            row.style.fontWeight = "bold";
+            row.style.color = team.color;
+        }
+        
+        row.innerHTML = `
+            <td>${team.name}</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updateTop25() {
+    const rankingList = document.getElementById('national-rankings');
+    rankingList.innerHTML = "";
+
+    // Sort all teams globally by prestige to mock a preseason Top 25
+    const topTeams = [...teams].sort((a, b) => b.prestige - a.prestige).slice(0, 25);
+
+    topTeams.forEach((team, index) => {
+        const li = document.createElement('li');
+        
+        // Highlight user's team if they happen to be in the Top 25
+        if(team.id === gameState.teamId) {
+            li.style.color = team.color;
+            li.style.fontWeight = "bold";
+        }
+        
+        li.innerHTML = `<span>#${index + 1} ${team.abbr}</span> <span style="float:right; color:#888;">${team.prestige} OVR</span>`;
+        rankingList.appendChild(li);
+    });
 }
 
 // Boot up app on the Main Menu
