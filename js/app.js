@@ -18,6 +18,56 @@ const header = document.getElementById('main-header');
 const teamInfoDiv = document.getElementById('team-info');
 const allViews = document.querySelectorAll('.view');
 
+// --- COACH CREATION LOGIC ---
+const STARTING_POINTS = 3;
+let availablePoints = STARTING_POINTS;
+
+// Temporary object to hold skills before submitting
+const tempSkills = {
+    scouting: 0,
+    recruiting: 0,
+    development: 0,
+    offense: 0,
+    defense: 0
+};
+
+// Grab skill UI elements
+const pointsDisplay = document.getElementById('points-remaining');
+const plusButtons = document.querySelectorAll('.btn-skill-plus');
+const minusButtons = document.querySelectorAll('.btn-skill-minus');
+
+// Function to update the screen numbers
+function updateSkillUI() {
+    pointsDisplay.textContent = availablePoints;
+    for (const [skill, val] of Object.entries(tempSkills)) {
+        document.getElementById(`skill-val-${skill}`).textContent = val;
+    }
+}
+
+// Plus Button Listeners
+plusButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const skill = e.target.dataset.skill;
+        if (availablePoints > 0) {
+            tempSkills[skill]++;
+            availablePoints--;
+            updateSkillUI();
+        }
+    });
+});
+
+// Minus Button Listeners
+minusButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const skill = e.target.dataset.skill;
+        if (tempSkills[skill] > 0) {
+            tempSkills[skill]--;
+            availablePoints++;
+            updateSkillUI();
+        }
+    });
+});
+
 // Buttons
 const btnNewGame = document.getElementById('btn-new-game');
 const btnSubmitCoach = document.getElementById('btn-submit-coach');
@@ -52,6 +102,9 @@ btnSubmitCoach.addEventListener('click', () => {
     gameState.coach.firstName = document.getElementById('coach-first').value || "Coach";
     gameState.coach.lastName = document.getElementById('coach-last').value || "Unknown";
     gameState.coach.age = parseInt(document.getElementById('coach-age').value);
+    
+    // Copy the distributed skills into the permanent gameState
+    gameState.coach.skills = { ...tempSkills };
 
     generateJobBoard();
     switchView('view-job-board');
