@@ -37,8 +37,63 @@
                 <label>Starting Age (25 - 65):</label>
                 <input type="number" id="coach-age" value="35" min="25" max="65" class="input-field">
                 
-                <p>Starting Skill Points: <span id="points-remaining">3</span></p>
-                <!-- We will add the skill tree +/- buttons here later -->
+                <!-- NEW SKILLS UI -->
+                <div class="skills-container">
+                    <div class="skills-header">
+                        <h3>Coaching Style</h3>
+                        <p>Unassigned Points: <span id="points-remaining" style="color: var(--accent); font-weight: bold;">3</span></p>
+                    </div>
+
+                    <!-- Scouting -->
+                    <div class="skill-row">
+                        <span>Scouting Network</span>
+                        <div class="skill-controls">
+                            <button class="btn-skill-minus secondary" data-skill="scouting">-</button>
+                            <span id="skill-val-scouting" class="skill-value">0</span>
+                            <button class="btn-skill-plus secondary" data-skill="scouting">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Recruiting -->
+                    <div class="skill-row">
+                        <span>Recruiting Prowess</span>
+                        <div class="skill-controls">
+                            <button class="btn-skill-minus secondary" data-skill="recruiting">-</button>
+                            <span id="skill-val-recruiting" class="skill-value">0</span>
+                            <button class="btn-skill-plus secondary" data-skill="recruiting">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Development -->
+                    <div class="skill-row">
+                        <span>Player Development</span>
+                        <div class="skill-controls">
+                            <button class="btn-skill-minus secondary" data-skill="development">-</button>
+                            <span id="skill-val-development" class="skill-value">0</span>
+                            <button class="btn-skill-plus secondary" data-skill="development">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Offense -->
+                    <div class="skill-row">
+                        <span>Offensive Tactics</span>
+                        <div class="skill-controls">
+                            <button class="btn-skill-minus secondary" data-skill="offense">-</button>
+                            <span id="skill-val-offense" class="skill-value">0</span>
+                            <button class="btn-skill-plus secondary" data-skill="offense">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Defense -->
+                    <div class="skill-row">
+                        <span>Defensive Tactics</span>
+                        <div class="skill-controls">
+                            <button class="btn-skill-minus secondary" data-skill="defense">-</button>
+                            <span id="skill-val-defense" class="skill-value">0</span>
+                            <button class="btn-skill-plus secondary" data-skill="defense">+</button>
+                        </div>
+                    </div>
+                </div>
 
                 <button id="btn-submit-coach">View Job Offers</button>
             </div>
