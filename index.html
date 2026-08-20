@@ -123,16 +123,16 @@
                 
                 <!-- Left Column: Immediate Actions -->
                 <div class="dash-col">
-                    <div class="dashboard-panel">
+                   <div class="dashboard-panel">
                         <h2>Next Game</h2>
-                        <p id="next-game-info">Week 1 vs. TBA</p>
-                        <button id="btn-play-game">Play Match</button>
-                        <button id="btn-sim-week" class="secondary">Simulate Week</button>
+                        <p id="next-game-label">Week 1 vs. TBA</p>
+                       <button id="btn-sim-week" class="secondary">Simulate Week</button>
+                       <button id="btn-view-schedule">Team Schedule</button>
                     </div>
-
+                    
                     <div class="dashboard-panel">
                         <h2>Team Management</h2>
-                        <button id="btn-view-roster" class="secondary">View Roster</button>
+                        <button id="btn-view-roster">View Roster</button>
                         <button id="btn-coach-tree" class="secondary">Coach Profile</button>
                     </div>
                 </div>
@@ -192,6 +192,35 @@
                 </div>
             </div>
         </section>
+
+        <!-- TEAM SCHEDULE SCREEN -->
+        <section id="view-schedule" class="view hidden">
+            <div class="dashboard-panel">
+                <h2>Season Schedule</h2>
+                <button id="btn-back-schedule" class="secondary" style="margin-bottom: 15px;">Back to Dashboard</button>
+                <div id="schedule-list" style="background: #222; padding: 15px; border-radius: 8px;">
+                    <!-- Generated via JS -->
+                </div>
+            </div>
+        </section>
+        
+        <!-- WEEKLY RECAP SCREEN -->
+        <section id="view-weekly-recap" class="view hidden">
+            <div class="dashboard-panel">
+                <h2 id="recap-header">Week X Results</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <button id="btn-recap-conf" class="secondary" style="margin: 0 5px 0 0;">My Conference</button>
+                        <button id="btn-recap-all" class="secondary" style="margin: 0;">National (All)</button>
+                    </div>
+                    <button id="btn-recap-continue" style="margin: 0; width: auto; padding: 8px 20px;">Continue</button>
+                </div>
+                <div id="recap-results-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <!-- Generated via JS -->
+                </div>
+            </div>
+        </section>
+        
     </main>
 
     <script type="module" src="js/app.js"></script>
