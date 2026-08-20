@@ -5,21 +5,41 @@ function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// NEW: Initialize the league with randomized prestige and zeroed records
+export function initializeLeague(baseTeams) {
+    return baseTeams.map(team => {
+        // Randomize prestige by +/- 4 points
+        const variance = Math.floor(Math.random() * 9) - 4; 
+        let newPrestige = team.prestige + variance;
+        
+        // Keep prestige within 1-99
+        if (newPrestige > 99) newPrestige = 99;
+        if (newPrestige < 1) newPrestige = 1;
+
+        return {
+            ...team, // Copy all base team data (id, name, color, confId)
+            prestige: newPrestige,
+            wins: 0,
+            losses: 0,
+            otl: 0
+        };
+    });
+}
+
 // Generate a single player
 function generatePlayer(position, teamPrestige) {
     const isGoalie = position === 'G';
     const yearRoll = Math.random();
     
-    // Weight class years (Freshmen and Sophomores are more common than Seniors)
+    // Weight class years
     let year = 'Fr';
-    if (yearRoll > 0.6) year = 'So';
-    if (yearRoll > 0.85) year = 'Jr';
-    if (yearRoll > 0.95) year = 'Sr';
+    if (yearRoll > 0.30) year = 'So';
+    if (yearRoll > 0.55) year = 'Jr';
+    if (yearRoll > 0.80) year = 'Sr';
 
-    // Base attributes scale slightly with team prestige so better teams start with better players
     const prestigeBonus = Math.floor(teamPrestige / 10); 
-    
     let stats = {};
+    
     if (isGoalie) {
         stats = {
             reflexes: randomInt(50, 70) + prestigeBonus,
@@ -38,13 +58,16 @@ function generatePlayer(position, teamPrestige) {
         };
     }
 
-    // Cap max stats at 99 for generation
+    // Cap stats and calculate Overall (OVR)
+    let statTotal = 0;
+    let statCount = 0;
     for (let key in stats) {
         if (stats[key] > 99) stats[key] = 99;
+        statTotal += stats[key];
+        statCount++;
     }
+    const overall = Math.round(statTotal / statCount);
 
-    // Potential rating (determines growth speed later)
-    // Scale from 50 to 99
     const potential = randomInt(55, 95);
 
     return {
@@ -53,9 +76,10 @@ function generatePlayer(position, teamPrestige) {
         lastName: getRandomLastName(),
         position: position,
         year: year,
+        overall: overall, // NEW OVR PROPERTY
         potential: potential,
         stats: stats,
-        status: 'Active' // Added this to track Redshirt/Scratched later!
+        status: 'Active' 
     };
 }
 
