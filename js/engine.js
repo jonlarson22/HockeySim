@@ -1,4 +1,4 @@
-import { getRandomName } from './data.js';
+import { getRandomFirstName, getRandomLastName } from './data.js';
 
 // Helper to generate a random number within a range
 function randomInt(min, max) {
@@ -49,45 +49,24 @@ function generatePlayer(position, teamPrestige) {
 
     return {
         id: 'p_' + Math.random().toString(36).substring(2, 9),
-        firstName: getRandomName(), // Pulls from your data.js helper
-        lastName: getRandomName(),
+        firstName: getRandomFirstName(), 
+        lastName: getRandomLastName(),
         position: position,
         year: year,
         potential: potential,
-        stats: stats
+        stats: stats,
+        status: 'Active' // Added this to track Redshirt/Scratched later!
     };
 }
 
 // Generate a full initial roster for a newly accepted team
 export function generateTeamRoster(teamPrestige) {
-    const roster = {
-        goalies: [
-            generatePlayer('G', teamPrestige),
-            generatePlayer('G', teamPrestige)
-        ],
-        defensemen: [
-            generatePlayer('D', teamPrestige),
-            generatePlayer('D', teamPrestige),
-            generatePlayer('D', teamPrestige),
-            generatePlayer('D', teamPrestige),
-            generatePlayer('D', teamPrestige),
-            generatePlayer('D', teamPrestige)
-        ],
-        forwards: [
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige),
-            generatePlayer('F', teamPrestige)
-        ]
+    return {
+        goalies: Array.from({ length: 3 }, () => generatePlayer('G', teamPrestige)),
+        defensemen: Array.from({ length: 8 }, () => generatePlayer('D', teamPrestige)),
+        forwards: Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige))
     };
+}
 
     return roster;
 }
