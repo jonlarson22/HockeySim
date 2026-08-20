@@ -67,6 +67,3 @@ export function generateTeamRoster(teamPrestige) {
         forwards: Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige))
     };
 }
-
-    return roster;
-}
