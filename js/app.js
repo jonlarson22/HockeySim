@@ -20,7 +20,7 @@ const teamInfoDiv = document.getElementById('team-info');
 const allViews = document.querySelectorAll('.view');
 
 // --- COACH CREATION LOGIC ---
-const STARTING_POINTS = 5;
+const STARTING_POINTS = 20; // 15 base points + 5 allocatable points
 const MAX_SKILL = 30;
 const BASE_SKILL = 3;
 
