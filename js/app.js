@@ -208,6 +208,8 @@ function initDashboard() {
     populateConferenceDropdown();
     updateStandingsTable(conferences[0].id); // Default to the first conference
     updateTop25();
+}
+
 function updateNextGameText() {
     const nextGameText = document.getElementById('next-game-text');
     if (!nextGameText) return;
@@ -230,7 +232,6 @@ function updateNextGameText() {
     } else {
         nextGameText.textContent = `Week ${gameState.currentWeek} - BYE WEEK`;
     }
-}
 }
 
 function populateConferenceDropdown() {
@@ -476,46 +477,6 @@ btnCoachTree.addEventListener('click', () => {
     // --- SIMULATION & WEEKLY RECAP LOGIC ---
 const btnSimWeek = document.getElementById('btn-sim-week');
 let lastSimulatedWeekIndex = 0;
-
-function renderWeeklyRecap(weekIndex, filter = 'conference') {
-    const recapContainer = document.getElementById('recap-results-list');
-    document.getElementById('recap-header').textContent = `Week ${weekIndex + 1} Results`;
-    recapContainer.innerHTML = "";
-
-    const weekGames = gameState.schedule[weekIndex];
-    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
-
-    // Filter logic
-    const gamesToShow = weekGames.filter(game => {
-        if (filter === 'all') return true;
-        
-        // 'conference' filter
-        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
-        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-        return homeTeam.confId === myTeam.confId || awayTeam.confId === myTeam.confId;
-    });
-
-    gamesToShow.forEach(game => {
-        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
-        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-        const otText = game.ot ? " <span style='color:#888; font-size:0.8em;'>(OT)</span>" : "";
-        
-        // Highlight player's team in the results
-        const homeColor = homeTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
-        const awayColor = awayTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
-
-        recapContainer.innerHTML += `
-            <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${homeTeam.color}; margin-bottom: 5px;">
-                <div style="display:flex; justify-content: space-between; color: ${awayColor}">
-                    <span>${awayTeam.abbr}</span> <span>${game.awayScore}</span>
-                </div>
-                <div style="display:flex; justify-content: space-between; color: ${homeColor}">
-                    <span>${homeTeam.abbr}</span> <span>${game.homeScore}${otText}</span>
-                </div>
-            </div>
-        `;
-    });
-}
 
 // Remove the old filter button listeners and replace with this function
 function populateRecapDropdown() {
