@@ -205,8 +205,17 @@ function acceptJob(team) {
 
 // --- DASHBOARD LOGIC ---
 function initDashboard() {
+    updateNextGameText(); // Fixes "Week 1 vs. TBA" bug
+    
     populateConferenceDropdown();
-    updateStandingsTable(conferences[0].id); // Default to the first conference
+    
+    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+    const startConfId = myTeam ? myTeam.confId : conferences[0].id;
+    
+    const select = document.getElementById('conference-select');
+    if (select) select.value = startConfId;
+    
+    updateStandingsTable(startConfId);
     updateTop25();
 }
 
@@ -253,15 +262,23 @@ function populateConferenceDropdown() {
 
 function updateStandingsTable(confId) {
     const tbody = document.getElementById('standings-body');
-    // Update table headers in HTML or dynamically here. Assuming you update index.html headers to:
-    // <tr><th>Team</th><th>CONF</th><th>PTS</th><th>OVR</th></tr>
     tbody.innerHTML = "";
 
-    const confTeams = gameState.leagueTeams.filter(t => t.confId === confId)
-                           .sort((a, b) => b.prestige - a.prestige); // Preseason sort
+    const confTeams = gameState.leagueTeams
+        .filter(t => t.confId === confId)
+        .sort((a, b) => {
+            const aConfPts = ((a.confWins || 0) * 2) + ((a.confOtl || 0) * 1);
+            const bConfPts = ((b.confWins || 0) * 2) + ((b.confOtl || 0) * 1);
+            if (bConfPts !== aConfPts) return bConfPts - aConfPts; // Primary: Conf Points
+
+            const aOvrPts = ((a.wins || 0) * 2) + ((a.otl || 0) * 1);
+            const bOvrPts = ((b.wins || 0) * 2) + ((b.otl || 0) * 1);
+            if (bOvrPts !== aOvrPts) return bOvrPts - aOvrPts;   // Tiebreaker 1: Overall Points
+
+            return b.prestige - a.prestige;                        // Tiebreaker 2: Prestige
+        });
 
     confTeams.forEach(team => {
-        // These will need to be populated by your engine.js eventually
         const confW = team.confWins || 0;
         const confL = team.confLosses || 0;
         const confOtl = team.confOtl || 0;
@@ -270,6 +287,7 @@ function updateStandingsTable(confId) {
         const w = team.wins || 0;
         const l = team.losses || 0;
         const otl = team.otl || 0;
+        const ovrPts = (w * 2) + (otl * 1);
 
         const row = document.createElement('tr');
         if(team.id === gameState.teamId) {
@@ -281,7 +299,8 @@ function updateStandingsTable(confId) {
             <td>${team.name}</td>
             <td>${confW}-${confL}-${confOtl}</td>
             <td>${confPts}</td>
-            <td style="color: #888;">${w}-${l}-${otl}</td>
+            <td style="color: #aaa;">${w}-${l}-${otl}</td>
+            <td style="color: #aaa;">${ovrPts}</td>
         `;
         tbody.appendChild(row);
     });
@@ -291,12 +310,19 @@ function updateTop25() {
     const rankingList = document.getElementById('national-rankings');
     rankingList.innerHTML = "";
 
-    // Dynamic Poll Calculation: Values wins, punishes losses, uses prestige to separate tied teams
-    const topTeams = [...gameState.leagueTeams].sort((a, b) => {
-        const aScore = ((a.wins || 0) * 10) - ((a.losses || 0) * 5) + (a.prestige * 0.1);
-        const bScore = ((b.wins || 0) * 10) - ((b.losses || 0) * 5) + (b.prestige * 0.1);
-        return bScore - aScore;
-    }).slice(0, 25);
+    // Pseudo-poll calculation balancing points, win percentage, loss penalties, and prestige
+    const getPollScore = (t) => {
+        const w = t.wins || 0;
+        const l = t.losses || 0;
+        const otl = t.otl || 0;
+        const overallPts = (w * 2) + (otl * 1);
+        const totalGames = w + l + otl;
+        const winPct = totalGames > 0 ? (overallPts / (totalGames * 2)) : 0;
+        
+        return (overallPts * 12) + (winPct * 50) + (t.prestige * 0.5) - (l * 2);
+    };
+
+    const topTeams = [...gameState.leagueTeams].sort((a, b) => getPollScore(b) - getPollScore(a)).slice(0, 25);
 
     topTeams.forEach((team, index) => {
         const li = document.createElement('li');
@@ -309,7 +335,8 @@ function updateTop25() {
         const l = team.losses || 0;
         const otl = team.otl || 0;
         
-        li.innerHTML = `<span>#${index + 1} ${team.abbr}</span> <span style="float:right; color:#888;">${w}-${l}-${otl}</span>`;
+        // Render Full Team Name instead of abbreviation
+        li.innerHTML = `<span>#${index + 1} ${team.name}</span> <span style="float:right; color:#888;">${w}-${l}-${otl}</span>`;
         rankingList.appendChild(li);
     });
 }
@@ -487,13 +514,6 @@ function populateRecapDropdown() {
         select.innerHTML += `<option value="${conf.id}">${conf.name}</option>`;
     });
 
-    // Default to the user's conference
-    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
-    if(myTeam) {
-        select.value = myTeam.confId;
-    }
-
-    // Attach listener to re-render when changed
     select.onchange = (e) => {
         renderWeeklyRecap(lastSimulatedWeekIndex, e.target.value);
     };
@@ -507,20 +527,19 @@ function renderWeeklyRecap(weekIndex, filterId) {
     const weekGames = gameState.schedule[weekIndex];
     const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
 
-    // Make sure dropdown is populated before we filter
     if (document.getElementById('recap-filter-select').options.length === 0) {
         populateRecapDropdown();
-        // If filterId wasn't passed, default it to the dropdown's value (myTeam.confId)
-        if (!filterId) filterId = document.getElementById('recap-filter-select').value;
     }
 
-    // Filter logic based on dropdown ID
+    // Set filter ID to player's conference by default
+    const activeFilter = (filterId && filterId !== 'conference') ? filterId : (myTeam ? myTeam.confId : 'all');
+    document.getElementById('recap-filter-select').value = activeFilter;
+
     const gamesToShow = weekGames.filter(game => {
-        if (filterId === 'all') return true;
-        
+        if (activeFilter === 'all') return true;
         const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
         const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-        return homeTeam.confId === filterId || awayTeam.confId === filterId;
+        return homeTeam.confId === activeFilter || awayTeam.confId === activeFilter;
     });
 
     gamesToShow.forEach(game => {
@@ -534,10 +553,10 @@ function renderWeeklyRecap(weekIndex, filterId) {
         recapContainer.innerHTML += `
             <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${homeTeam.color}; margin-bottom: 5px;">
                 <div style="display:flex; justify-content: space-between; color: ${awayColor}">
-                    <span>${awayTeam.abbr}</span> <span>${game.awayScore}</span>
+                    <span>${awayTeam.name}</span> <span>${game.awayScore}</span>
                 </div>
                 <div style="display:flex; justify-content: space-between; color: ${homeColor}">
-                    <span>${homeTeam.abbr}</span> <span>${game.homeScore}${otText}</span>
+                    <span>${homeTeam.name}</span> <span>${game.homeScore}${otText}</span>
                 </div>
             </div>
         `;
@@ -553,15 +572,15 @@ document.getElementById('btn-recap-continue').addEventListener('click', () => {
 // Single Unified Simulate Button Listener
 if (btnSimWeek) {
     btnSimWeek.addEventListener('click', () => {
-        lastSimulatedWeekIndex = gameState.currentWeek - 1; // Capture the week we are about to sim
+        lastSimulatedWeekIndex = gameState.currentWeek - 1;
         
         const seasonActive = simulateWeek(gameState);
         
         if (seasonActive) {
-            console.log(`Simulated Week ${lastSimulatedWeekIndex + 1}. Now entering Week ${gameState.currentWeek}`);
+            const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+            const userConfId = myTeam ? myTeam.confId : conferences[0].id;
             
-            // Show the weekly recap screen before returning to the dashboard
-            renderWeeklyRecap(lastSimulatedWeekIndex, 'conference');
+            renderWeeklyRecap(lastSimulatedWeekIndex, userConfId);
             switchView('view-weekly-recap');
         } else {
             alert("The regular season is over! Time for the postseason.");
