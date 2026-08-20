@@ -279,20 +279,79 @@ const btnViewRoster = document.getElementById('btn-view-roster');
 const btnCoachTree = document.getElementById('btn-coach-tree'); 
 
 // 1. Render Roster
+// Helper to open the modal
+function openPlayerModal(player) {
+    document.getElementById('modal-name').textContent = `${player.firstName} ${player.lastName}`;
+    document.getElementById('modal-bio').textContent = `${player.year} | Position: ${player.position} | Potential: ${player.potential}`;
+    
+    let statsHTML = "<ul>";
+    for (const [stat, val] of Object.entries(player.stats)) {
+        statsHTML += `<li><strong>${stat.toUpperCase()}:</strong> ${val}</li>`;
+    }
+    statsHTML += "</ul>";
+    
+    document.getElementById('modal-stats').innerHTML = statsHTML;
+    document.getElementById('player-modal').classList.remove('hidden');
+}
+
+// Close Modal Listener
+document.getElementById('btn-close-modal').addEventListener('click', () => {
+    document.getElementById('player-modal').classList.add('hidden');
+});
+
+// Render the Advanced Roster
 btnViewRoster.addEventListener('click', () => {
     const rosterDiv = document.getElementById('roster-list');
     const { goalies, defensemen, forwards } = gameState.roster;
     
-    // Quick and dirty render - we can style this beautifully later
-    let html = `<h3>Forwards</h3><ul>`;
-    forwards.forEach(p => html += `<li>${p.firstName} ${p.lastName} (${p.year})</li>`);
-    html += `</ul><h3>Defensemen</h3><ul>`;
-    defensemen.forEach(p => html += `<li>${p.firstName} ${p.lastName} (${p.year})</li>`);
-    html += `</ul><h3>Goalies</h3><ul>`;
-    goalies.forEach(p => html += `<li>${p.firstName} ${p.lastName} (${p.year})</li>`);
-    html += `</ul>`;
+    // Helper to generate a row for a player with a role dropdown
+    const renderPlayerRow = (p, roleOptions) => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px;">
+            <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none;">
+                ${p.firstName} ${p.lastName} (${p.year})
+            </a>
+            <select class="role-select" data-id="${p.id}">
+                ${roleOptions.map(opt => `<option value="${opt}" ${p.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+            </select>
+        </div>
+    `;
+
+    const forwardRoles = ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Scratched', 'Redshirt'];
+    const defenseRoles = ['Pair 1', 'Pair 2', 'Pair 3', 'Scratched', 'Redshirt'];
+    const goalieRoles = ['Starter', 'Backup', 'Scratched', 'Redshirt'];
+
+    let html = `<h3>Forwards</h3>`;
+    forwards.forEach(p => html += renderPlayerRow(p, forwardRoles));
+    
+    html += `<h3 style="margin-top:15px;">Defensemen</h3>`;
+    defensemen.forEach(p => html += renderPlayerRow(p, defenseRoles));
+    
+    html += `<h3 style="margin-top:15px;">Goalies</h3>`;
+    goalies.forEach(p => html += renderPlayerRow(p, goalieRoles));
     
     rosterDiv.innerHTML = html;
+    
+    // Attach click listeners to all the new player links
+    document.querySelectorAll('.player-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const playerId = e.target.getAttribute('data-id');
+            // Find the player across all groups
+            const player = [...forwards, ...defensemen, ...goalies].find(p => p.id === playerId);
+            if(player) openPlayerModal(player);
+        });
+    });
+
+    // Attach change listeners to save line combinations to game state
+    document.querySelectorAll('.role-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const playerId = e.target.getAttribute('data-id');
+            const newRole = e.target.value;
+            const player = [...forwards, ...defensemen, ...goalies].find(p => p.id === playerId);
+            if(player) player.status = newRole; 
+            // In a real app, we'd validate here (e.g., ensuring only 3 forwards are on "Line 1")
+        });
+    });
     
     document.getElementById('btn-back-roster').onclick = () => switchView('view-dashboard');
     switchView('view-roster');
