@@ -1,5 +1,5 @@
 import { teams as baseTeams, conferences } from './data.js';
-import { generateTeamRoster, initializeLeague } from './engine.js';
+import { generateTeamRoster, initializeLeague, generateSeasonSchedule } from './engine.js';
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
@@ -188,9 +188,13 @@ function generateJobBoard() {
 function acceptJob(team) {
     gameState.teamId = team.id;
     
-    // Generate the roster based on the team's prestige rating
+    // Generate the roster based on team prestige
     gameState.roster = generateTeamRoster(team.prestige);
     
+    // NEW: Generate the full 38-week schedule for the league!
+    gameState.schedule = generateSeasonSchedule(gameState.leagueTeams, conferences);
+    gameState.currentWeek = 1; // Track where we are in the season
+
     // Update Header
     teamInfoDiv.textContent = `${gameState.coach.lastName} | ${team.name} HC`;
     teamInfoDiv.style.color = team.color;
