@@ -48,8 +48,10 @@ export const lastNames = [
 ];
 
 // 4. Helper Function: Generate a Random Player Name
-export function getRandomName() {
-  const first = firstNames[Math.floor(Math.random() * firstNames.length)];
-  const last = lastNames[Math.floor(Math.random() * lastNames.length)];
-  return `${first} ${last}`;
+export function getRandomFirstName() {
+    return firstNames[Math.floor(Math.random() * firstNames.length)];
+}
+
+export function getRandomLastName() {
+    return lastNames[Math.floor(Math.random() * lastNames.length)];
 }
