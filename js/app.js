@@ -1,4 +1,4 @@
-import { teams, conferences, getRandomName } from './data.js';
+import { teams, conferences } from './data.js';
 import { generateTeamRoster } from './engine.js';
 
 // --- GAME STATE ---
