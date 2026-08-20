@@ -12,7 +12,14 @@
         <h1>College Hockey Dynasty</h1>
         <div id="team-info" class="team-badge">No Team Assigned</div>
     </header>
-
+    
+        <div id="player-modal" class="hidden" style="position: fixed; top: 10%; left: 50%; transform: translateX(-50%); background: #1e1e1e; padding: 20px; border: 2px solid var(--accent); z-index: 100; min-width: 300px;">
+            <h2 id="modal-name">Player Name</h2>
+            <p id="modal-bio">Year | Position</p>
+            <div id="modal-stats" style="margin: 15px 0;"></div>
+            <button id="btn-close-modal" class="secondary">Close</button>
+        </div>
+    
     <main>
         <!-- 1. MAIN MENU SCREEN -->
         <section id="view-main-menu" class="view">
