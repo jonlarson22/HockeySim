@@ -175,7 +175,21 @@
         <section id="view-roster" class="view hidden">
             <div class="dashboard-panel">
                 <h2>Team Roster</h2>
-                <button id="btn-back-roster" class="secondary">Back to Dashboard</button>
+                
+                <!-- Added a flex container to put the back button and the sort dropdown on the same line -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <button id="btn-back-roster" class="secondary" style="margin: 0;">Back to Dashboard</button>
+                    
+                    <div>
+                        <label for="roster-sort">Sort By: </label>
+                        <select id="roster-sort" class="input-field" style="width: auto; display: inline-block; padding: 5px;">
+                            <option value="overall">Overall Rating</option>
+                            <option value="potential">Potential</option>
+                            <option value="age">Class Year</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div id="roster-list" style="margin-top: 1rem;">
                     <!-- Populated by JS -->
                 </div>
