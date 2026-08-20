@@ -8,7 +8,8 @@ let gameState = {
         firstName: "",
         lastName: "",
         age: 35,
-        skills: {}
+        skills: {},
+        history: [] // New array to store past season results
     },
     teamId: null,
     year: 2026
@@ -302,6 +303,31 @@ btnCoachTree.addEventListener('click', () => {
     const coachDiv = document.getElementById('coach-details');
     const c = gameState.coach;
     
+    // Generate the history table
+    let historyHTML = `
+        <table class="standings-table" style="margin-top: 1rem;">
+            <thead>
+                <tr><th>Year</th><th>Team</th><th>W-L-OTL</th><th>Nat. Rank</th></tr>
+            </thead>
+            <tbody>
+    `;
+    
+    if (c.history.length === 0) {
+        historyHTML += `<tr><td colspan="4" style="text-align:center;">No completed seasons.</td></tr>`;
+    } else {
+        c.history.forEach(season => {
+            historyHTML += `
+                <tr>
+                    <td>${season.year}</td>
+                    <td>${season.teamName}</td>
+                    <td>${season.wins}-${season.losses}-${season.otl}</td>
+                    <td>${season.rank <= 25 ? '#' + season.rank : 'Unranked'}</td>
+                </tr>
+            `;
+        });
+    }
+    historyHTML += `</tbody></table>`;
+
     coachDiv.innerHTML = `
         <p><strong>Name:</strong> ${c.firstName} ${c.lastName}</p>
         <p><strong>Age:</strong> ${c.age}</p>
@@ -314,6 +340,9 @@ btnCoachTree.addEventListener('click', () => {
             <li>Recruiting: ${c.skills.recruiting}</li>
             <li>Scouting: ${c.skills.scouting}</li>
         </ul>
+        <hr style="margin: 1rem 0; border-color: #333;">
+        <h3>Career History</h3>
+        ${historyHTML}
     `;
     
     document.getElementById('btn-back-coach').onclick = () => switchView('view-dashboard');
