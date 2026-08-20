@@ -1,5 +1,5 @@
 import { teams as baseTeams, conferences } from './data.js';
-import { generateTeamRoster, initializeLeague, generateSeasonSchedule } from './engine.js';
+import { generateTeamRoster, initializeLeague, generateSeasonSchedule, simulateWeek } from './engine.js';
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
@@ -418,6 +418,27 @@ btnCoachTree.addEventListener('click', () => {
     document.getElementById('btn-back-coach').onclick = () => switchView('view-dashboard');
     switchView('view-coach-profile');
 });
+
+    // Simulate Week Button Listener
+    const btnSimWeek = document.getElementById('btn-sim-week');
+    
+    if (btnSimWeek) {
+        btnSimWeek.addEventListener('click', () => {
+            const seasonActive = simulateWeek(gameState);
+            
+            if (seasonActive) {
+                // Re-render the UI to reflect new standings and records
+                const currentConfId = document.getElementById('conference-select').value;
+                updateStandingsTable(currentConfId);
+                updateTop25();
+                
+                // Optional: Update a UI element showing the current week
+                console.log(`Simulated Week ${gameState.currentWeek - 1}. Now entering Week ${gameState.currentWeek}`);
+            } else {
+                alert("The regular season is over! Time for the postseason.");
+            }
+        });
+    }
 
 // Boot up app on the Main Menu
 switchView('view-main-menu');
