@@ -48,7 +48,7 @@ function generatePlayer(position, teamPrestige) {
     const potential = randomInt(55, 95);
 
     return {
-        id: 'p_' + Math.random().toString(36.substring(2, 9)),
+        id: 'p_' + Math.random().toString(36).substring(2, 9),
         firstName: getRandomName(), // Pulls from your data.js helper
         lastName: getRandomName(),
         position: position,
