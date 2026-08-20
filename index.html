@@ -150,6 +150,7 @@
                                     <th>Team</th>
                                     <th>W</th>
                                     <th>L</th>
+                                    <th>OTL</th> <!-- NEW COLUMN -->
                                     <th>PTS</th>
                                 </tr>
                             </thead>
@@ -160,6 +161,28 @@
                     </div>
                 </div>
 
+            </div>
+        </section>
+
+        <!-- 5. ROSTER SCREEN -->
+        <section id="view-roster" class="view hidden">
+            <div class="dashboard-panel">
+                <h2>Team Roster</h2>
+                <button id="btn-back-roster" class="secondary">Back to Dashboard</button>
+                <div id="roster-list" style="margin-top: 1rem;">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
+        
+        <!-- 6. COACH PROFILE SCREEN -->
+        <section id="view-coach-profile" class="view hidden">
+            <div class="dashboard-panel">
+                <h2>Coach Profile</h2>
+                <button id="btn-back-coach" class="secondary">Back to Dashboard</button>
+                <div id="coach-details" style="margin-top: 1rem;">
+                    <!-- Populated by JS -->
+                </div>
             </div>
         </section>
     </main>
