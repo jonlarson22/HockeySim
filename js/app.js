@@ -208,6 +208,29 @@ function initDashboard() {
     populateConferenceDropdown();
     updateStandingsTable(conferences[0].id); // Default to the first conference
     updateTop25();
+function updateNextGameText() {
+    const nextGameText = document.getElementById('next-game-text');
+    if (!nextGameText) return;
+
+    // Check if the season is over
+    if (gameState.currentWeek > gameState.schedule.length) {
+        nextGameText.textContent = "Regular Season Complete";
+        return;
+    }
+
+    const weekGames = gameState.schedule[gameState.currentWeek - 1];
+    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+    const myGame = weekGames.find(g => g.homeTeamId === myTeam.id || g.awayTeamId === myTeam.id);
+
+    if (myGame) {
+        const isHome = myGame.homeTeamId === myTeam.id;
+        const opponentId = isHome ? myGame.awayTeamId : myGame.homeTeamId;
+        const opponent = gameState.leagueTeams.find(t => t.id === opponentId);
+        nextGameText.textContent = `Week ${gameState.currentWeek} ${isHome ? 'vs.' : '@'} ${opponent.abbr}`;
+    } else {
+        nextGameText.textContent = `Week ${gameState.currentWeek} - BYE WEEK`;
+    }
+}
 }
 
 function populateConferenceDropdown() {
@@ -229,18 +252,23 @@ function populateConferenceDropdown() {
 
 function updateStandingsTable(confId) {
     const tbody = document.getElementById('standings-body');
+    // Update table headers in HTML or dynamically here. Assuming you update index.html headers to:
+    // <tr><th>Team</th><th>CONF</th><th>PTS</th><th>OVR</th></tr>
     tbody.innerHTML = "";
 
-    // Sort by points eventually, but prestige is fine for preseason
     const confTeams = gameState.leagueTeams.filter(t => t.confId === confId)
-                           .sort((a, b) => b.prestige - a.prestige);
+                           .sort((a, b) => b.prestige - a.prestige); // Preseason sort
 
     confTeams.forEach(team => {
-        // Safe fallbacks before the sim starts generating stats
+        // These will need to be populated by your engine.js eventually
+        const confW = team.confWins || 0;
+        const confL = team.confLosses || 0;
+        const confOtl = team.confOtl || 0;
+        const confPts = (confW * 2) + (confOtl * 1);
+        
         const w = team.wins || 0;
         const l = team.losses || 0;
         const otl = team.otl || 0;
-        const pts = (w * 2) + (otl * 1); // Hockey point system
 
         const row = document.createElement('tr');
         if(team.id === gameState.teamId) {
@@ -250,10 +278,9 @@ function updateStandingsTable(confId) {
         
         row.innerHTML = `
             <td>${team.name}</td>
-            <td>${w}</td>
-            <td>${l}</td>
-            <td>${otl}</td>
-            <td>${pts}</td>
+            <td>${confW}-${confL}-${confOtl}</td>
+            <td>${confPts}</td>
+            <td style="color: #888;">${w}-${l}-${otl}</td>
         `;
         tbody.appendChild(row);
     });
@@ -263,8 +290,12 @@ function updateTop25() {
     const rankingList = document.getElementById('national-rankings');
     rankingList.innerHTML = "";
 
-    // Preseason sort by prestige
-    const topTeams = [...gameState.leagueTeams].sort((a, b) => b.prestige - a.prestige).slice(0, 25);
+    // Dynamic Poll Calculation: Values wins, punishes losses, uses prestige to separate tied teams
+    const topTeams = [...gameState.leagueTeams].sort((a, b) => {
+        const aScore = ((a.wins || 0) * 10) - ((a.losses || 0) * 5) + (a.prestige * 0.1);
+        const bScore = ((b.wins || 0) * 10) - ((b.losses || 0) * 5) + (b.prestige * 0.1);
+        return bScore - aScore;
+    }).slice(0, 25);
 
     topTeams.forEach((team, index) => {
         const li = document.createElement('li');
