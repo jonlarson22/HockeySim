@@ -309,17 +309,32 @@ document.getElementById('btn-close-modal').addEventListener('click', () => {
 });
 
 // Render the Advanced Roster
-btnViewRoster.addEventListener('click', () => {
+// --- ROSTER LOGIC ---
+const rosterSortSelect = document.getElementById('roster-sort');
+
+function renderRoster(sortBy = 'overall') {
     const rosterDiv = document.getElementById('roster-list');
     const { goalies, defensemen, forwards } = gameState.roster;
     
-    // Helper to generate a row for a player with a role dropdown
+    // Convert year string to number for sorting (Sr first)
+    const yearVal = { 'Fr': 1, 'So': 2, 'Jr': 3, 'Sr': 4 };
+
+    // Helper to sort player arrays
+    const sortPlayers = (players) => {
+        return [...players].sort((a, b) => {
+            if (sortBy === 'overall') return b.overall - a.overall;
+            if (sortBy === 'potential') return b.potential - a.potential;
+            if (sortBy === 'age') return yearVal[b.year] - yearVal[a.year]; 
+            return 0;
+        });
+    };
+
+    // Helper to generate a row
     const renderPlayerRow = (p, roleOptions) => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px;">
-            <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none;">
-                <!-- NEW: Added OVR badge next to the name -->
-                <span style="display:inline-block; width: 30px; font-weight:bold; color: #fff;">${p.overall}</span> 
-                ${p.firstName} ${p.lastName} (${p.year})
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px; border-radius: 4px;">
+            <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none; display: flex; align-items: center;">
+                <span style="background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; border: 1px solid #555;">OVR: ${p.overall}</span> 
+                ${p.firstName} ${p.lastName} <span style="color:#aaa; font-size:0.9em; margin-left: 5px;">(${p.year})</span>
             </a>
             <select class="role-select" data-id="${p.id}">
                 ${roleOptions.map(opt => `<option value="${opt}" ${p.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
@@ -327,46 +342,53 @@ btnViewRoster.addEventListener('click', () => {
         </div>
     `;
 
-    const forwardRoles = ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Scratched', 'Redshirt'];
-    const defenseRoles = ['Pair 1', 'Pair 2', 'Pair 3', 'Scratched', 'Redshirt'];
-    const goalieRoles = ['Starter', 'Backup', 'Scratched', 'Redshirt'];
+    // Simplified Roles for development scaling
+    const rosterRoles = ['Active Roster', 'Practice Squad', 'Redshirt'];
 
     let html = `<h3>Forwards</h3>`;
-    forwards.forEach(p => html += renderPlayerRow(p, forwardRoles));
+    sortPlayers(forwards).forEach(p => html += renderPlayerRow(p, rosterRoles));
     
     html += `<h3 style="margin-top:15px;">Defensemen</h3>`;
-    defensemen.forEach(p => html += renderPlayerRow(p, defenseRoles));
+    sortPlayers(defensemen).forEach(p => html += renderPlayerRow(p, rosterRoles));
     
     html += `<h3 style="margin-top:15px;">Goalies</h3>`;
-    goalies.forEach(p => html += renderPlayerRow(p, goalieRoles));
+    sortPlayers(goalies).forEach(p => html += renderPlayerRow(p, rosterRoles));
     
     rosterDiv.innerHTML = html;
     
-    // Attach click listeners to all the new player links
+    // Attach Listeners
     document.querySelectorAll('.player-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            const playerId = e.target.getAttribute('data-id');
-            // Find the player across all groups
+            // Traverse up to the anchor tag in case they clicked the span
+            const anchor = e.target.closest('a'); 
+            const playerId = anchor.getAttribute('data-id');
             const player = [...forwards, ...defensemen, ...goalies].find(p => p.id === playerId);
             if(player) openPlayerModal(player);
         });
     });
 
-    // Attach change listeners to save line combinations to game state
     document.querySelectorAll('.role-select').forEach(select => {
         select.addEventListener('change', (e) => {
             const playerId = e.target.getAttribute('data-id');
-            const newRole = e.target.value;
             const player = [...forwards, ...defensemen, ...goalies].find(p => p.id === playerId);
-            if(player) player.status = newRole; 
-            // In a real app, we'd validate here (e.g., ensuring only 3 forwards are on "Line 1")
+            if(player) player.status = e.target.value; 
         });
     });
-    
-    document.getElementById('btn-back-roster').onclick = () => switchView('view-dashboard');
+}
+
+// Initial Roster Button Hook
+btnViewRoster.addEventListener('click', () => {
+    renderRoster(rosterSortSelect.value);
     switchView('view-roster');
 });
+
+// Roster Sort Change Listener
+rosterSortSelect.addEventListener('change', (e) => {
+    renderRoster(e.target.value);
+});
+
+document.getElementById('btn-back-roster').onclick = () => switchView('view-dashboard');
 
 // 2. Render Coach Profile
 btnCoachTree.addEventListener('click', () => {
@@ -421,7 +443,76 @@ btnCoachTree.addEventListener('click', () => {
 
     // Simulate Week Button Listener
     const btnSimWeek = document.getElementById('btn-sim-week');
-    
+
+    // --- WEEKLY RECAP LOGIC ---
+        let lastSimulatedWeekIndex = 0;
+        
+        function renderWeeklyRecap(weekIndex, filter = 'conference') {
+            const recapContainer = document.getElementById('recap-results-list');
+            document.getElementById('recap-header').textContent = `Week ${weekIndex + 1} Results`;
+            recapContainer.innerHTML = "";
+        
+            const weekGames = gameState.schedule[weekIndex];
+            const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+        
+            // Filter logic
+            const gamesToShow = weekGames.filter(game => {
+                if (filter === 'all') return true;
+                
+                // 'conference' filter
+                const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+                const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+                return homeTeam.confId === myTeam.confId || awayTeam.confId === myTeam.confId;
+            });
+        
+            gamesToShow.forEach(game => {
+                const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+                const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+                const otText = game.ot ? " <span style='color:#888; font-size:0.8em;'>(OT)</span>" : "";
+                
+                // Highlight player's team in the results
+                const homeColor = homeTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
+                const awayColor = awayTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
+        
+                recapContainer.innerHTML += `
+                    <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${homeTeam.color}">
+                        <div style="display:flex; justify-content: space-between; color: ${awayColor}">
+                            <span>${awayTeam.abbr}</span> <span>${game.awayScore}</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; color: ${homeColor}">
+                            <span>${homeTeam.abbr}</span> <span>${game.homeScore}${otText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        // Attach filter buttons
+        document.getElementById('btn-recap-conf').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'conference'));
+        document.getElementById('btn-recap-all').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'all'));
+        
+        // Continue button returns to dashboard
+        document.getElementById('btn-recap-continue').addEventListener('click', () => {
+            initDashboard(); // Refresh standings/Top 25
+            switchView('view-dashboard');
+        });
+        
+        // Update the Simulate Button to route to the Recap Screen
+        const btnSimWeek = document.getElementById('btn-sim-week');
+        if (btnSimWeek) {
+            btnSimWeek.addEventListener('click', () => {
+                lastSimulatedWeekIndex = gameState.currentWeek - 1; // Capture the week we are about to sim
+                const seasonActive = simulateWeek(gameState);
+                
+                if (seasonActive) {
+                    renderWeeklyRecap(lastSimulatedWeekIndex, 'conference');
+                    switchView('view-weekly-recap');
+                } else {
+                    alert("The regular season is over! Time for the postseason.");
+                }
+            });
+        }
+
     if (btnSimWeek) {
         btnSimWeek.addEventListener('click', () => {
             const seasonActive = simulateWeek(gameState);
@@ -439,6 +530,55 @@ btnCoachTree.addEventListener('click', () => {
             }
         });
     }
+
+// --- SCHEDULE LOGIC ---
+        const btnViewSchedule = document.getElementById('btn-view-schedule');
+        
+        function generateTeamSchedule() {
+            const scheduleContainer = document.getElementById('schedule-list');
+            scheduleContainer.innerHTML = "";
+            
+            const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+        
+            gameState.schedule.forEach((weekGames, index) => {
+                const weekNum = index + 1;
+                // Find the game my team plays this week
+                const myGame = weekGames.find(g => g.homeTeamId === myTeam.id || g.awayTeamId === myTeam.id);
+                
+                let rowHtml = `<div style="padding: 10px; border-bottom: 1px solid #444; display: flex; justify-content: space-between;">`;
+                rowHtml += `<strong>Week ${weekNum}</strong>`;
+                
+                if (!myGame) {
+                    rowHtml += `<span style="color: #888;">BYE WEEK</span></div>`;
+                } else {
+                    const isHome = myGame.homeTeamId === myTeam.id;
+                    const opponentId = isHome ? myGame.awayTeamId : myGame.homeTeamId;
+                    const opponent = gameState.leagueTeams.find(t => t.id === opponentId);
+                    
+                    const matchText = isHome ? `vs. ${opponent.name}` : `@ ${opponent.name}`;
+                    
+                    if (myGame.played) {
+                        // Determine if we won
+                        const myScore = isHome ? myGame.homeScore : myGame.awayScore;
+                        const oppScore = isHome ? myGame.awayScore : myGame.homeScore;
+                        let result = myScore > oppScore ? '<span style="color: #4ade80;">W</span>' : '<span style="color: #f87171;">L</span>';
+                        if (myGame.ot) result += ' (OT)';
+                        
+                        rowHtml += `<span>${matchText}</span> <span>${result} ${myScore} - ${oppScore}</span>`;
+                    } else {
+                        rowHtml += `<span>${matchText}</span> <span>--</span>`;
+                    }
+                    rowHtml += `</div>`;
+                }
+                scheduleContainer.innerHTML += rowHtml;
+            });
+        }
+        
+        btnViewSchedule.addEventListener('click', () => {
+            generateTeamSchedule();
+            switchView('view-schedule');
+        });
+        document.getElementById('btn-back-schedule').onclick = () => switchView('view-dashboard');
 
 // Boot up app on the Main Menu
 switchView('view-main-menu');
