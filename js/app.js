@@ -222,13 +222,18 @@ function updateStandingsTable(confId) {
     const tbody = document.getElementById('standings-body');
     tbody.innerHTML = "";
 
-    // Filter teams by conference, then sort by prestige (as a mock for wins for now)
+    // Sort by points eventually, but prestige is fine for preseason
     const confTeams = teams.filter(t => t.confId === confId)
                            .sort((a, b) => b.prestige - a.prestige);
 
     confTeams.forEach(team => {
+        // Safe fallbacks before the sim starts generating stats
+        const w = team.wins || 0;
+        const l = team.losses || 0;
+        const otl = team.otl || 0;
+        const pts = (w * 2) + (otl * 1); // Hockey point system
+
         const row = document.createElement('tr');
-        // If it's the user's team, highlight it
         if(team.id === gameState.teamId) {
             row.style.fontWeight = "bold";
             row.style.color = team.color;
@@ -236,9 +241,10 @@ function updateStandingsTable(confId) {
         
         row.innerHTML = `
             <td>${team.name}</td>
-            <td>0</td>
-            <td>0</td>
-            <td>0</td>
+            <td>${w}</td>
+            <td>${l}</td>
+            <td>${otl}</td>
+            <td>${pts}</td>
         `;
         tbody.appendChild(row);
     });
@@ -248,22 +254,71 @@ function updateTop25() {
     const rankingList = document.getElementById('national-rankings');
     rankingList.innerHTML = "";
 
-    // Sort all teams globally by prestige to mock a preseason Top 25
+    // Preseason sort by prestige
     const topTeams = [...teams].sort((a, b) => b.prestige - a.prestige).slice(0, 25);
 
     topTeams.forEach((team, index) => {
         const li = document.createElement('li');
-        
-        // Highlight user's team if they happen to be in the Top 25
         if(team.id === gameState.teamId) {
             li.style.color = team.color;
             li.style.fontWeight = "bold";
         }
         
-        li.innerHTML = `<span>#${index + 1} ${team.abbr}</span> <span style="float:right; color:#888;">${team.prestige} OVR</span>`;
+        const w = team.wins || 0;
+        const l = team.losses || 0;
+        const otl = team.otl || 0;
+        
+        li.innerHTML = `<span>#${index + 1} ${team.abbr}</span> <span style="float:right; color:#888;">${w}-${l}-${otl}</span>`;
         rankingList.appendChild(li);
     });
 }
+
+// --- TEAM MANAGEMENT BUTTONS ---
+const btnViewRoster = document.getElementById('btn-view-roster');
+const btnCoachTree = document.getElementById('btn-coach-tree'); 
+
+// 1. Render Roster
+btnViewRoster.addEventListener('click', () => {
+    const rosterDiv = document.getElementById('roster-list');
+    const { goalies, defensemen, forwards } = gameState.roster;
+    
+    // Quick and dirty render - we can style this beautifully later
+    let html = `<h3>Forwards</h3><ul>`;
+    forwards.forEach(p => html += `<li>${p.firstName} ${p.lastName} (${p.year})</li>`);
+    html += `</ul><h3>Defensemen</h3><ul>`;
+    defensemen.forEach(p => html += `<li>${p.firstName} ${p.lastName} (${p.year})</li>`);
+    html += `</ul><h3>Goalies</h3><ul>`;
+    goalies.forEach(p => html += `<li>${p.firstName} ${p.lastName} (${p.year})</li>`);
+    html += `</ul>`;
+    
+    rosterDiv.innerHTML = html;
+    
+    document.getElementById('btn-back-roster').onclick = () => switchView('view-dashboard');
+    switchView('view-roster');
+});
+
+// 2. Render Coach Profile
+btnCoachTree.addEventListener('click', () => {
+    const coachDiv = document.getElementById('coach-details');
+    const c = gameState.coach;
+    
+    coachDiv.innerHTML = `
+        <p><strong>Name:</strong> ${c.firstName} ${c.lastName}</p>
+        <p><strong>Age:</strong> ${c.age}</p>
+        <hr style="margin: 1rem 0; border-color: #333;">
+        <h3>Attribute Ratings</h3>
+        <ul>
+            <li>Offense: ${c.skills.offense}</li>
+            <li>Defense: ${c.skills.defense}</li>
+            <li>Development: ${c.skills.development}</li>
+            <li>Recruiting: ${c.skills.recruiting}</li>
+            <li>Scouting: ${c.skills.scouting}</li>
+        </ul>
+    `;
+    
+    document.getElementById('btn-back-coach').onclick = () => switchView('view-dashboard');
+    switchView('view-coach-profile');
+});
 
 // Boot up app on the Main Menu
 switchView('view-main-menu');
