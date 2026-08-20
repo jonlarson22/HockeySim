@@ -517,9 +517,71 @@ function renderWeeklyRecap(weekIndex, filter = 'conference') {
     });
 }
 
-// Attach filter buttons
-document.getElementById('btn-recap-conf').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'conference'));
-document.getElementById('btn-recap-all').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'all'));
+// Remove the old filter button listeners and replace with this function
+function populateRecapDropdown() {
+    const select = document.getElementById('recap-filter-select');
+    select.innerHTML = `<option value="all">National (All)</option>`;
+    
+    conferences.forEach(conf => {
+        select.innerHTML += `<option value="${conf.id}">${conf.name}</option>`;
+    });
+
+    // Default to the user's conference
+    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+    if(myTeam) {
+        select.value = myTeam.confId;
+    }
+
+    // Attach listener to re-render when changed
+    select.onchange = (e) => {
+        renderWeeklyRecap(lastSimulatedWeekIndex, e.target.value);
+    };
+}
+
+function renderWeeklyRecap(weekIndex, filterId) {
+    const recapContainer = document.getElementById('recap-results-list');
+    document.getElementById('recap-header').textContent = `Week ${weekIndex + 1} Results`;
+    recapContainer.innerHTML = "";
+
+    const weekGames = gameState.schedule[weekIndex];
+    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+
+    // Make sure dropdown is populated before we filter
+    if (document.getElementById('recap-filter-select').options.length === 0) {
+        populateRecapDropdown();
+        // If filterId wasn't passed, default it to the dropdown's value (myTeam.confId)
+        if (!filterId) filterId = document.getElementById('recap-filter-select').value;
+    }
+
+    // Filter logic based on dropdown ID
+    const gamesToShow = weekGames.filter(game => {
+        if (filterId === 'all') return true;
+        
+        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+        return homeTeam.confId === filterId || awayTeam.confId === filterId;
+    });
+
+    gamesToShow.forEach(game => {
+        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+        const otText = game.ot ? " <span style='color:#888; font-size:0.8em;'>(OT)</span>" : "";
+        
+        const homeColor = homeTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
+        const awayColor = awayTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
+
+        recapContainer.innerHTML += `
+            <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${homeTeam.color}; margin-bottom: 5px;">
+                <div style="display:flex; justify-content: space-between; color: ${awayColor}">
+                    <span>${awayTeam.abbr}</span> <span>${game.awayScore}</span>
+                </div>
+                <div style="display:flex; justify-content: space-between; color: ${homeColor}">
+                    <span>${homeTeam.abbr}</span> <span>${game.homeScore}${otText}</span>
+                </div>
+            </div>
+        `;
+    });
+}
 
 // Continue button returns to dashboard and updates standings
 document.getElementById('btn-recap-continue').addEventListener('click', () => {
