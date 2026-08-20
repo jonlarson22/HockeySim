@@ -151,7 +151,7 @@ function generateJobBoard() {
     jobList.innerHTML = ""; // Clear list
     
     // 1. Filter for bottom tier teams (Tier 3 / Mountain West)
-    let availableJobs = teams.filter(t => t.confId === "conf_mw");
+    let availableJobs = teams.filter(t => t.prestige <= 60);
 
     // 2. Shuffle the array to randomize (Fisher-Yates shuffle approach)
     availableJobs = availableJobs.sort(() => 0.5 - Math.random());
