@@ -333,7 +333,8 @@ function renderRoster(sortBy = 'overall') {
     const renderPlayerRow = (p, roleOptions) => `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px; border-radius: 4px;">
             <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none; display: flex; align-items: center;">
-                <span style="background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; border: 1px solid #555;">OVR: ${p.overall}</span> 
+                <span style="background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 5px; border: 1px solid #555;">OVR: ${p.overall}</span> 
+                <span style="background: #1e3a8a; color: #93c5fd; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; border: 1px solid #3b82f6;">POT: ${p.potential}</span>
                 ${p.firstName} ${p.lastName} <span style="color:#aaa; font-size:0.9em; margin-left: 5px;">(${p.year})</span>
             </a>
             <select class="role-select" data-id="${p.id}">
