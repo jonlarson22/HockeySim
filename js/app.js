@@ -1,5 +1,5 @@
-import { teams, conferences } from './data.js';
-import { generateTeamRoster } from './engine.js';
+import { teams as baseTeams, conferences } from './data.js';
+import { generateTeamRoster, initializeLeague } from './engine.js';
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
@@ -12,7 +12,8 @@ let gameState = {
         history: [] // New array to store past season results
     },
     teamId: null,
-    year: 2026
+    year: 2026,
+    leagueTeams: [] // NEW: Will hold the randomized teams
 };
 
 // --- DOM ELEMENTS ---
@@ -142,6 +143,9 @@ btnSubmitCoach.addEventListener('click', () => {
     gameState.coach.age = parseInt(document.getElementById('coach-age').value);
     gameState.coach.skills = { ...tempSkills };
 
+    // NEW: Initialize the league with randomized prestige
+    gameState.leagueTeams = initializeLeague(baseTeams);
+
     generateJobBoard();
     switchView('view-job-board');
 });
@@ -151,7 +155,7 @@ function generateJobBoard() {
     jobList.innerHTML = ""; // Clear list
     
     // 1. Filter for bottom tier teams (Tier 3 / Mountain West)
-    let availableJobs = teams.filter(t => t.prestige <= 59);
+    let availableJobs = gameState.leagueTeams.filter(t => t.prestige <= 59);
 
     // 2. Shuffle the array to randomize (Fisher-Yates shuffle approach)
     availableJobs = availableJobs.sort(() => 0.5 - Math.random());
@@ -224,7 +228,7 @@ function updateStandingsTable(confId) {
     tbody.innerHTML = "";
 
     // Sort by points eventually, but prestige is fine for preseason
-    const confTeams = teams.filter(t => t.confId === confId)
+    const confTeams = gameState.leagueTeams.filter(t => t.confId === confId)
                            .sort((a, b) => b.prestige - a.prestige);
 
     confTeams.forEach(team => {
@@ -256,7 +260,7 @@ function updateTop25() {
     rankingList.innerHTML = "";
 
     // Preseason sort by prestige
-    const topTeams = [...teams].sort((a, b) => b.prestige - a.prestige).slice(0, 25);
+    const topTeams = [...gameState.leagueTeams].sort((a, b) => b.prestige - a.prestige).slice(0, 25);
 
     topTeams.forEach((team, index) => {
         const li = document.createElement('li');
@@ -282,7 +286,8 @@ const btnCoachTree = document.getElementById('btn-coach-tree');
 // Helper to open the modal
 function openPlayerModal(player) {
     document.getElementById('modal-name').textContent = `${player.firstName} ${player.lastName}`;
-    document.getElementById('modal-bio').textContent = `${player.year} | Position: ${player.position} | Potential: ${player.potential}`;
+    // NEW: Added OVR to the bio line
+    document.getElementById('modal-bio').textContent = `${player.year} | Position: ${player.position} | OVR: ${player.overall} | POT: ${player.potential}`;
     
     let statsHTML = "<ul>";
     for (const [stat, val] of Object.entries(player.stats)) {
@@ -308,6 +313,8 @@ btnViewRoster.addEventListener('click', () => {
     const renderPlayerRow = (p, roleOptions) => `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px;">
             <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none;">
+                <!-- NEW: Added OVR badge next to the name -->
+                <span style="display:inline-block; width: 30px; font-weight:bold; color: #fff;">${p.overall}</span> 
                 ${p.firstName} ${p.lastName} (${p.year})
             </a>
             <select class="role-select" data-id="${p.id}">
