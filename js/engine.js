@@ -8,20 +8,21 @@ function randomInt(min, max) {
 // NEW: Initialize the league with randomized prestige and zeroed records
 export function initializeLeague(baseTeams) {
     return baseTeams.map(team => {
-        // Randomize prestige by +/- 4 points
         const variance = Math.floor(Math.random() * 9) - 4; 
         let newPrestige = team.prestige + variance;
         
-        // Keep prestige within 1-99
         if (newPrestige > 99) newPrestige = 99;
         if (newPrestige < 1) newPrestige = 1;
 
         return {
-            ...team, // Copy all base team data (id, name, color, confId)
+            ...team,
             prestige: newPrestige,
             wins: 0,
             losses: 0,
-            otl: 0
+            otl: 0,
+            confWins: 0,
+            confLosses: 0,
+            confOtl: 0
         };
     });
 }
@@ -293,10 +294,11 @@ export function simulateWeek(gameState) {
     const weekGames = gameState.schedule[currentWeekIndex];
 
     weekGames.forEach(game => {
-        if (game.played) return;
+    if (game.played) return;
 
         const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
         const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+        const isConfGame = game.type === 'conf';
 
         // Basic simulation logic based on prestige difference
         const prestigeDiff = homeTeam.prestige - awayTeam.prestige;
@@ -332,24 +334,31 @@ export function simulateWeek(gameState) {
         game.ot = isOT;
         game.played = true;
 
-        // Update Team Records (Hockey points format: 2 for W, 0 for L, 1 for OTL)
-        if (homeGoals > awayGoals) {
-            homeTeam.wins = (homeTeam.wins || 0) + 1;
-            if (isOT) {
-                awayTeam.otl = (awayTeam.otl || 0) + 1;
-            } else {
-                awayTeam.losses = (awayTeam.losses || 0) + 1;
-            }
-        } else {
-            awayTeam.wins = (awayTeam.wins || 0) + 1;
-            if (isOT) {
-                homeTeam.otl = (homeTeam.otl || 0) + 1;
-            } else {
-                homeTeam.losses = (homeTeam.losses || 0) + 1;
-            }
-        }
-    });
+        // Update Team Records
+    if (homeGoals > awayGoals) {
+        homeTeam.wins = (homeTeam.wins || 0) + 1;
+        if (isConfGame) homeTeam.confWins = (homeTeam.confWins || 0) + 1;
 
+        if (isOT) {
+            awayTeam.otl = (awayTeam.otl || 0) + 1;
+            if (isConfGame) awayTeam.confOtl = (awayTeam.confOtl || 0) + 1;
+        } else {
+            awayTeam.losses = (awayTeam.losses || 0) + 1;
+            if (isConfGame) awayTeam.confLosses = (awayTeam.confLosses || 0) + 1;
+        }
+    } else {
+        awayTeam.wins = (awayTeam.wins || 0) + 1;
+        if (isConfGame) awayTeam.confWins = (awayTeam.confWins || 0) + 1;
+
+        if (isOT) {
+            homeTeam.otl = (homeTeam.otl || 0) + 1;
+            if (isConfGame) homeTeam.confOtl = (homeTeam.confOtl || 0) + 1;
+        } else {
+            homeTeam.losses = (homeTeam.losses || 0) + 1;
+            if (isConfGame) homeTeam.confLosses = (homeTeam.confLosses || 0) + 1;
+        }
+    }
+});
     // Advance the week
     gameState.currentWeek++;
     return true;
