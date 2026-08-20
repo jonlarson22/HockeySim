@@ -441,144 +441,128 @@ btnCoachTree.addEventListener('click', () => {
     switchView('view-coach-profile');
 });
 
-    // Simulate Week Button Listener
-    const btnSimWeek = document.getElementById('btn-sim-week');
+    // --- SIMULATION & WEEKLY RECAP LOGIC ---
+const btnSimWeek = document.getElementById('btn-sim-week');
+let lastSimulatedWeekIndex = 0;
 
-    // --- WEEKLY RECAP LOGIC ---
-        let lastSimulatedWeekIndex = 0;
-        
-        function renderWeeklyRecap(weekIndex, filter = 'conference') {
-            const recapContainer = document.getElementById('recap-results-list');
-            document.getElementById('recap-header').textContent = `Week ${weekIndex + 1} Results`;
-            recapContainer.innerHTML = "";
-        
-            const weekGames = gameState.schedule[weekIndex];
-            const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
-        
-            // Filter logic
-            const gamesToShow = weekGames.filter(game => {
-                if (filter === 'all') return true;
-                
-                // 'conference' filter
-                const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
-                const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-                return homeTeam.confId === myTeam.confId || awayTeam.confId === myTeam.confId;
-            });
-        
-            gamesToShow.forEach(game => {
-                const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
-                const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-                const otText = game.ot ? " <span style='color:#888; font-size:0.8em;'>(OT)</span>" : "";
-                
-                // Highlight player's team in the results
-                const homeColor = homeTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
-                const awayColor = awayTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
-        
-                recapContainer.innerHTML += `
-                    <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${homeTeam.color}">
-                        <div style="display:flex; justify-content: space-between; color: ${awayColor}">
-                            <span>${awayTeam.abbr}</span> <span>${game.awayScore}</span>
-                        </div>
-                        <div style="display:flex; justify-content: space-between; color: ${homeColor}">
-                            <span>${homeTeam.abbr}</span> <span>${game.homeScore}${otText}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        
-        // Attach filter buttons
-        document.getElementById('btn-recap-conf').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'conference'));
-        document.getElementById('btn-recap-all').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'all'));
-        
-        // Continue button returns to dashboard
-        document.getElementById('btn-recap-continue').addEventListener('click', () => {
-            initDashboard(); // Refresh standings/Top 25
-            switchView('view-dashboard');
-        });
-        
-        // Update the Simulate Button to route to the Recap Screen
-        const btnSimWeek = document.getElementById('btn-sim-week');
-        if (btnSimWeek) {
-            btnSimWeek.addEventListener('click', () => {
-                lastSimulatedWeekIndex = gameState.currentWeek - 1; // Capture the week we are about to sim
-                const seasonActive = simulateWeek(gameState);
-                
-                if (seasonActive) {
-                    renderWeeklyRecap(lastSimulatedWeekIndex, 'conference');
-                    switchView('view-weekly-recap');
-                } else {
-                    alert("The regular season is over! Time for the postseason.");
-                }
-            });
-        }
+function renderWeeklyRecap(weekIndex, filter = 'conference') {
+    const recapContainer = document.getElementById('recap-results-list');
+    document.getElementById('recap-header').textContent = `Week ${weekIndex + 1} Results`;
+    recapContainer.innerHTML = "";
 
-    if (btnSimWeek) {
-        btnSimWeek.addEventListener('click', () => {
-            const seasonActive = simulateWeek(gameState);
+    const weekGames = gameState.schedule[weekIndex];
+    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+
+    // Filter logic
+    const gamesToShow = weekGames.filter(game => {
+        if (filter === 'all') return true;
+        
+        // 'conference' filter
+        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+        return homeTeam.confId === myTeam.confId || awayTeam.confId === myTeam.confId;
+    });
+
+    gamesToShow.forEach(game => {
+        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+        const otText = game.ot ? " <span style='color:#888; font-size:0.8em;'>(OT)</span>" : "";
+        
+        // Highlight player's team in the results
+        const homeColor = homeTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
+        const awayColor = awayTeam.id === myTeam.id ? 'var(--accent)' : '#fff';
+
+        recapContainer.innerHTML += `
+            <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${homeTeam.color}; margin-bottom: 5px;">
+                <div style="display:flex; justify-content: space-between; color: ${awayColor}">
+                    <span>${awayTeam.abbr}</span> <span>${game.awayScore}</span>
+                </div>
+                <div style="display:flex; justify-content: space-between; color: ${homeColor}">
+                    <span>${homeTeam.abbr}</span> <span>${game.homeScore}${otText}</span>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// Attach filter buttons
+document.getElementById('btn-recap-conf').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'conference'));
+document.getElementById('btn-recap-all').addEventListener('click', () => renderWeeklyRecap(lastSimulatedWeekIndex, 'all'));
+
+// Continue button returns to dashboard and updates standings
+document.getElementById('btn-recap-continue').addEventListener('click', () => {
+    initDashboard(); // Refresh standings and Top 25 with the new data
+    switchView('view-dashboard');
+});
+
+// Single Unified Simulate Button Listener
+if (btnSimWeek) {
+    btnSimWeek.addEventListener('click', () => {
+        lastSimulatedWeekIndex = gameState.currentWeek - 1; // Capture the week we are about to sim
+        
+        const seasonActive = simulateWeek(gameState);
+        
+        if (seasonActive) {
+            console.log(`Simulated Week ${lastSimulatedWeekIndex + 1}. Now entering Week ${gameState.currentWeek}`);
             
-            if (seasonActive) {
-                // Re-render the UI to reflect new standings and records
-                const currentConfId = document.getElementById('conference-select').value;
-                updateStandingsTable(currentConfId);
-                updateTop25();
-                
-                // Optional: Update a UI element showing the current week
-                console.log(`Simulated Week ${gameState.currentWeek - 1}. Now entering Week ${gameState.currentWeek}`);
-            } else {
-                alert("The regular season is over! Time for the postseason.");
-            }
-        });
-    }
+            // Show the weekly recap screen before returning to the dashboard
+            renderWeeklyRecap(lastSimulatedWeekIndex, 'conference');
+            switchView('view-weekly-recap');
+        } else {
+            alert("The regular season is over! Time for the postseason.");
+        }
+    });
+}
 
 // --- SCHEDULE LOGIC ---
-        const btnViewSchedule = document.getElementById('btn-view-schedule');
+const btnViewSchedule = document.getElementById('btn-view-schedule');
+
+function generateTeamSchedule() {
+    const scheduleContainer = document.getElementById('schedule-list');
+    scheduleContainer.innerHTML = "";
+    
+    const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+
+    gameState.schedule.forEach((weekGames, index) => {
+        const weekNum = index + 1;
+        // Find the game my team plays this week
+        const myGame = weekGames.find(g => g.homeTeamId === myTeam.id || g.awayTeamId === myTeam.id);
         
-        function generateTeamSchedule() {
-            const scheduleContainer = document.getElementById('schedule-list');
-            scheduleContainer.innerHTML = "";
+        let rowHtml = `<div style="padding: 10px; border-bottom: 1px solid #444; display: flex; justify-content: space-between;">`;
+        rowHtml += `<strong>Week ${weekNum}</strong>`;
+        
+        if (!myGame) {
+            rowHtml += `<span style="color: #888;">BYE WEEK</span></div>`;
+        } else {
+            const isHome = myGame.homeTeamId === myTeam.id;
+            const opponentId = isHome ? myGame.awayTeamId : myGame.homeTeamId;
+            const opponent = gameState.leagueTeams.find(t => t.id === opponentId);
             
-            const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
-        
-            gameState.schedule.forEach((weekGames, index) => {
-                const weekNum = index + 1;
-                // Find the game my team plays this week
-                const myGame = weekGames.find(g => g.homeTeamId === myTeam.id || g.awayTeamId === myTeam.id);
+            const matchText = isHome ? `vs. ${opponent.name}` : `@ ${opponent.name}`;
+            
+            if (myGame.played) {
+                // Determine if we won
+                const myScore = isHome ? myGame.homeScore : myGame.awayScore;
+                const oppScore = isHome ? myGame.awayScore : myGame.homeScore;
+                let result = myScore > oppScore ? '<span style="color: #4ade80;">W</span>' : '<span style="color: #f87171;">L</span>';
+                if (myGame.ot) result += ' (OT)';
                 
-                let rowHtml = `<div style="padding: 10px; border-bottom: 1px solid #444; display: flex; justify-content: space-between;">`;
-                rowHtml += `<strong>Week ${weekNum}</strong>`;
-                
-                if (!myGame) {
-                    rowHtml += `<span style="color: #888;">BYE WEEK</span></div>`;
-                } else {
-                    const isHome = myGame.homeTeamId === myTeam.id;
-                    const opponentId = isHome ? myGame.awayTeamId : myGame.homeTeamId;
-                    const opponent = gameState.leagueTeams.find(t => t.id === opponentId);
-                    
-                    const matchText = isHome ? `vs. ${opponent.name}` : `@ ${opponent.name}`;
-                    
-                    if (myGame.played) {
-                        // Determine if we won
-                        const myScore = isHome ? myGame.homeScore : myGame.awayScore;
-                        const oppScore = isHome ? myGame.awayScore : myGame.homeScore;
-                        let result = myScore > oppScore ? '<span style="color: #4ade80;">W</span>' : '<span style="color: #f87171;">L</span>';
-                        if (myGame.ot) result += ' (OT)';
-                        
-                        rowHtml += `<span>${matchText}</span> <span>${result} ${myScore} - ${oppScore}</span>`;
-                    } else {
-                        rowHtml += `<span>${matchText}</span> <span>--</span>`;
-                    }
-                    rowHtml += `</div>`;
-                }
-                scheduleContainer.innerHTML += rowHtml;
-            });
+                rowHtml += `<span>${matchText}</span> <span>${result} ${myScore} - ${oppScore}</span>`;
+            } else {
+                rowHtml += `<span>${matchText}</span> <span>--</span>`;
+            }
+            rowHtml += `</div>`;
         }
-        
-        btnViewSchedule.addEventListener('click', () => {
-            generateTeamSchedule();
-            switchView('view-schedule');
-        });
-        document.getElementById('btn-back-schedule').onclick = () => switchView('view-dashboard');
+        scheduleContainer.innerHTML += rowHtml;
+    });
+}
+
+btnViewSchedule.addEventListener('click', () => {
+    generateTeamSchedule();
+    switchView('view-schedule');
+});
+
+document.getElementById('btn-back-schedule').onclick = () => switchView('view-dashboard');
 
 // Boot up app on the Main Menu
 switchView('view-main-menu');
