@@ -195,7 +195,7 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
         // Generate a single round-robin set of pairings (n - 1 rounds)
         let rounds = [];
         let rotatingTeams = [...teamsList];
-        let fixedTeam = rotatingTeam.shift();
+        let fixedTeam = rotatingTeams.shift();
 
         for (let r = 0; r < n - 1; r++) {
             let roundPairings = [];
@@ -279,4 +279,78 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
     }
 
     return schedule;
+}
+
+// --- SIMULATION ENGINE ---
+export function simulateWeek(gameState) {
+    const currentWeekIndex = gameState.currentWeek - 1;
+    
+    // Check if the season is over
+    if (currentWeekIndex >= gameState.schedule.length) {
+        return false; 
+    }
+
+    const weekGames = gameState.schedule[currentWeekIndex];
+
+    weekGames.forEach(game => {
+        if (game.played) return;
+
+        const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+        const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+
+        // Basic simulation logic based on prestige difference
+        const prestigeDiff = homeTeam.prestige - awayTeam.prestige;
+        
+        // Base goals (0 to 4)
+        let homeGoals = Math.floor(Math.random() * 5);
+        let awayGoals = Math.floor(Math.random() * 5);
+
+        // Home ice advantage
+        homeGoals += 1;
+
+        // Prestige modifiers
+        if (prestigeDiff > 10) homeGoals += 1;
+        if (prestigeDiff > 30) homeGoals += 1;
+        if (prestigeDiff < -10) awayGoals += 1;
+        if (prestigeDiff < -30) awayGoals += 1;
+
+        // Handle Hockey Ties (Overtime)
+        let isOT = false;
+        if (homeGoals === awayGoals) {
+            isOT = true;
+            // Coin flip for the OT winner
+            if (Math.random() > 0.5) {
+                homeGoals += 1;
+            } else {
+                awayGoals += 1;
+            }
+        }
+
+        // Save results to the game object
+        game.homeScore = homeGoals;
+        game.awayScore = awayGoals;
+        game.ot = isOT;
+        game.played = true;
+
+        // Update Team Records (Hockey points format: 2 for W, 0 for L, 1 for OTL)
+        if (homeGoals > awayGoals) {
+            homeTeam.wins = (homeTeam.wins || 0) + 1;
+            if (isOT) {
+                awayTeam.otl = (awayTeam.otl || 0) + 1;
+            } else {
+                awayTeam.losses = (awayTeam.losses || 0) + 1;
+            }
+        } else {
+            awayTeam.wins = (awayTeam.wins || 0) + 1;
+            if (isOT) {
+                homeTeam.otl = (homeTeam.otl || 0) + 1;
+            } else {
+                homeTeam.losses = (homeTeam.losses || 0) + 1;
+            }
+        }
+    });
+
+    // Advance the week
+    gameState.currentWeek++;
+    return true;
 }
