@@ -222,16 +222,18 @@
         <!-- WEEKLY RECAP SCREEN -->
         <section id="view-weekly-recap" class="view hidden">
             <div class="dashboard-panel">
-                <h2 id="recap-header">Week X Results</h2>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <div>
-                        <button id="btn-recap-conf" class="secondary" style="margin: 0 5px 0 0;">My Conference</button>
-                        <button id="btn-recap-all" class="secondary" style="margin: 0;">National (All)</button>
-                    </div>
-                    <button id="btn-recap-continue" style="margin: 0; width: auto; padding: 8px 20px;">Continue</button>
+                    <h2 id="recap-header" style="margin: 0;">Week 1 Results</h2>
+                    <button id="btn-recap-continue" class="primary" style="margin: 0; width: auto; padding: 8px 20px;">Continue</button>
                 </div>
-                <div id="recap-results-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <!-- Generated via JS -->
+                
+                <!-- New Dropdown -->
+                <select id="recap-filter-select" class="input-field" style="width: 100%; margin-bottom: 15px;">
+                    <!-- JS Populated -->
+                </select>
+            
+                <div id="recap-results-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Populated by JS -->
                 </div>
             </div>
         </section>
