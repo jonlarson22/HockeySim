@@ -253,6 +253,47 @@
                 </div>
             </div>
         </section>
+
+        <!-- 7. RECRUITING HUB SCREEN -->
+        <section id="view-recruiting" class="view hidden">
+            <div class="dashboard-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <h2>Offseason Recruiting - Week <span id="recruiting-week-num">1</span>/5</h2>
+                        <p style="color: #aaa; margin: 0;">Points Available: <strong id="recruiting-points-left" style="color: var(--accent);">0</strong></p>
+                    </div>
+                    <button id="btn-submit-recruiting" class="primary" style="width: auto;">Submit Points & Advance Week</button>
+                </div>
+
+                <!-- Target Filters -->
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="btn-rec-filter-targets" class="secondary" style="width: auto; padding: 6px 12px;">My Targets Only</button>
+                    <button id="btn-rec-filter-all" class="secondary" style="width: auto; padding: 6px 12px; background: #444;">All Prospects</button>
+                    <select id="recruiting-pos-filter" class="input-field" style="width: auto; padding: 6px;">
+                        <option value="ALL">All Positions</option>
+                        <option value="F">Forwards</option>
+                        <option value="D">Defensemen</option>
+                        <option value="G">Goalies</option>
+                    </select>
+                </div>
+
+                <div id="recruiting-prospect-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 550px; overflow-y: auto;">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 8. RECRUITING WEEKLY RECAP SCREEN -->
+        <section id="view-recruiting-recap" class="view hidden">
+            <div class="dashboard-panel">
+                <h2>Recruiting Activity Log</h2>
+                <p id="recruiting-recap-subtitle">Results from this week's visits and pitches.</p>
+                <div id="recruiting-recap-list" style="display: flex; flex-direction: column; gap: 10px; margin: 20px 0;">
+                    <!-- Populated by JS -->
+                </div>
+                <button id="btn-continue-recruiting" class="primary">Continue Offseason</button>
+            </div>
+        </section>
         
     </main>
 
