@@ -488,6 +488,7 @@ export function simulateWeek(gameState) {
     if (gameState.currentWeek === 40) generateConferenceSemifinals(gameState);
     if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
     if (gameState.currentWeek === 42) generateNationalTournament(gameState);
+}
 
 export function processOffSeason(gameState) {
     const coachDev = gameState.coach.skills.development || 5;
