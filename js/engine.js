@@ -1,5 +1,12 @@
 import { getRandomFirstName, getRandomLastName } from './data.js';
 
+import { 
+    generateConferenceQuarterfinals, 
+    generateConferenceSemifinals, 
+    generateConferenceFinals,
+    generateNationalTournament 
+} from './tournaments.js';
+
 // Helper to generate a random number within a range
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -70,6 +77,10 @@ function generatePlayer(position, teamPrestige) {
     const overall = Math.round(statTotal / statCount);
 
     const potential = randomInt(55, 95);
+    if (overall >= potential) {
+        potential = overall + randomInt(1, 6); 
+        if (potential > 99) potential = 99;
+    }
 
     return {
         id: 'p_' + Math.random().toString(36).substring(2, 9),
@@ -372,31 +383,38 @@ export function simulateWeek(gameState) {
             // 1. INJURIES
             if (player.injuryWeeks > 0) {
                 player.injuryWeeks--; // Heal over time
+                // THE FIX: Put them back on the active roster when healed
+                if (player.injuryWeeks === 0 && player.status === 'Practice Squad') {
+                    player.status = 'Active Roster';
+                }
             } else if (player.status === 'Active Roster' && Math.random() < 0.02) {
-                // 2% chance for an active player to get hurt (1 to 4 weeks)
                 player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
-                // Auto-move to Practice Squad to force the coach to make a roster move
                 player.status = 'Practice Squad'; 
             }
 
-            // 2. IN-SEASON PROGRESSION
-            // Base 15% chance, plus up to 20% based on coach development skill (max 30)
-            const progressionChance = 0.15 + ((coachDev / 30) * 0.20); 
+            // 2. DYNAMIC IN-SEASON PROGRESSION
+            // Calculate the gap between potential and overall
+            const gap = player.potential - player.overall;
             
-            if (Math.random() < progressionChance) {
-                // Pick a random attribute to upgrade
-                const statKeys = Object.keys(player.stats);
-                const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
+            // Only progress if they haven't hit their ceiling
+            if (gap > 0) {
+                // Progression scales based on the size of the gap and coach development skill
+                const progressionChance = 0.15 + ((coachDev / 30) * 0.20) + (gap * 0.005); 
                 
-                if (player.stats[randomStat] < 99) {
-                    player.stats[randomStat]++;
+                if (Math.random() < progressionChance) {
+                    const statKeys = Object.keys(player.stats);
+                    const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
                     
-                    // Recalculate OVR
-                    let statTotal = 0;
-                    for (let key in player.stats) {
-                        statTotal += player.stats[key];
+                    if (player.stats[randomStat] < 99) {
+                        player.stats[randomStat]++;
+                        
+                        // Recalculate OVR
+                        let statTotal = 0;
+                        for (let key in player.stats) {
+                            statTotal += player.stats[key];
+                        }
+                        player.overall = Math.round(statTotal / statKeys.length);
                     }
-                    player.overall = Math.round(statTotal / statKeys.length);
                 }
             }
         });
@@ -406,11 +424,10 @@ export function simulateWeek(gameState) {
     gameState.currentWeek++;
 
     // TRIGGER TOURNAMENTS
-    if (gameState.currentWeek === 39) {
-        // Import generateConferenceQuarterfinals at the top of engine.js to call this
-        generateConferenceQuarterfinals(gameState);
-    }
-    // We will add triggers for week 40 (Semis) and 41 (Finals) next!
+    if (gameState.currentWeek === 39) generateConferenceQuarterfinals(gameState);
+    if (gameState.currentWeek === 40) generateConferenceSemifinals(gameState);
+    if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
+    if (gameState.currentWeek === 42) generateNationalTournament(gameState);
 
     return true;
 }
