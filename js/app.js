@@ -395,35 +395,44 @@ function renderRoster(sortBy = 'overall') {
         });
     };
 
-    // Check if we are past the non-conference schedule
-    const isLocked = gameState.currentWeek > 10;
-    const lockAttr = isLocked ? 'disabled title="Rosters locked for conference play"' : '';
+    const renderPlayerRow = (p) => {
+        const isPastWeek10 = gameState.currentWeek > 10;
+        const isCurrentlyRedshirt = p.status === 'Redshirt';
+        
+        // Completely lock the dropdown if they are a redshirt past week 10
+        const lockDropdownAttr = (isPastWeek10 && isCurrentlyRedshirt) ? 'disabled title="Redshirt locked"' : '';
+        
+        // Disable the redshirt option if past week 10 OR if they've used it before
+        const disableRedshirt = (isPastWeek10 || p.redshirtUsed) ? 'disabled' : '';
 
-    // Update the renderPlayerRow helper to include the lockAttr
-    const renderPlayerRow = (p, roleOptions) => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px; border-radius: 4px;">
-            <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none; display: flex; align-items: center;">
-                <span style="background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 5px; border: 1px solid #555;">OVR: ${p.overall}</span> 
-                <span style="background: #1e3a8a; color: #93c5fd; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; border: 1px solid #3b82f6;">POT: ${p.potential}</span>
-                ${p.firstName} ${p.lastName} <span style="color:#aaa; font-size:0.9em; margin-left: 5px;">(${p.year})</span>
-            </a>
-            <select class="role-select" data-id="${p.id}" ${lockAttr} style="${isLocked ? 'background: #444; cursor: not-allowed;' : ''}">
-                ${roleOptions.map(opt => `<option value="${opt}" ${p.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
-            </select>
-        </div>
-    `;
+        // Display injury tag if hurt
+        const injuryTag = p.injuryWeeks > 0 ? `<span style="background: #8b0000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 5px; border: 1px solid #ff0000;">INJ (${p.injuryWeeks}W)</span>` : '';
 
-    // Simplified Roles for development scaling
-    const rosterRoles = ['Active Roster', 'Practice Squad', 'Redshirt'];
+        return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px; border-radius: 4px;">
+                <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none; display: flex; align-items: center;">
+                    <span style="background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 5px; border: 1px solid #555;">OVR: ${p.overall}</span> 
+                    <span style="background: #1e3a8a; color: #93c5fd; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; border: 1px solid #3b82f6;">POT: ${p.potential}</span>
+                    ${injuryTag}
+                    ${p.firstName} ${p.lastName} <span style="color:#aaa; font-size:0.9em; margin-left: 5px;">(${p.year})</span>
+                </a>
+                <select class="role-select" data-id="${p.id}" ${lockDropdownAttr} style="${(isPastWeek10 && isCurrentlyRedshirt) ? 'background: #444; cursor: not-allowed;' : ''}">
+                    <option value="Active Roster" ${p.status === 'Active Roster' ? 'selected' : ''}>Active Roster</option>
+                    <option value="Practice Squad" ${p.status === 'Practice Squad' ? 'selected' : ''}>Practice Squad</option>
+                    <option value="Redshirt" ${p.status === 'Redshirt' ? 'selected' : ''} ${disableRedshirt}>Redshirt</option>
+                </select>
+            </div>
+        `;
+    };
 
     let html = `<h3>Forwards</h3>`;
-    sortPlayers(forwards).forEach(p => html += renderPlayerRow(p, rosterRoles));
+    sortPlayers(forwards).forEach(p => html += renderPlayerRow(p));
     
     html += `<h3 style="margin-top:15px;">Defensemen</h3>`;
-    sortPlayers(defensemen).forEach(p => html += renderPlayerRow(p, rosterRoles));
+    sortPlayers(defensemen).forEach(p => html += renderPlayerRow(p));
     
     html += `<h3 style="margin-top:15px;">Goalies</h3>`;
-    sortPlayers(goalies).forEach(p => html += renderPlayerRow(p, rosterRoles));
+    sortPlayers(goalies).forEach(p => html += renderPlayerRow(p));
     
     rosterDiv.innerHTML = html;
     
@@ -431,7 +440,6 @@ function renderRoster(sortBy = 'overall') {
     document.querySelectorAll('.player-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            // Traverse up to the anchor tag in case they clicked the span
             const anchor = e.target.closest('a'); 
             const playerId = anchor.getAttribute('data-id');
             const player = [...forwards, ...defensemen, ...goalies].find(p => p.id === playerId);
