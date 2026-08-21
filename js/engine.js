@@ -29,7 +29,8 @@ export function initializeLeague(baseTeams) {
             otl: 0,
             confWins: 0,
             confLosses: 0,
-            confOtl: 0
+            confOtl: 0,
+            roster: generateTeamRoster(newPrestige) 
         };
     });
 }
