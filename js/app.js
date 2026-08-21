@@ -335,8 +335,15 @@ function updateTop25() {
         const l = team.losses || 0;
         const otl = team.otl || 0;
         
-        // Render Full Team Name instead of abbreviation
-        li.innerHTML = `<span>#${index + 1} ${team.name}</span> <span style="float:right; color:#888;">${w}-${l}-${otl}</span>`;
+        // Extract location name, accounting for two-word places
+        let locationName = team.name.split(' ')[0];
+        if (team.name.startsWith("New ") || team.name.startsWith("Rhode ")) {
+            const parts = team.name.split(' ');
+            locationName = parts[0] + " " + parts[1];
+        }
+
+        // Added font-size: 0.9em to shrink the text
+        li.innerHTML = `<span style="font-size: 0.9em;">#${index + 1} ${locationName}</span> <span style="float:right; color:#888; font-size: 0.9em;">${w}-${l}-${otl}</span>`;
         rankingList.appendChild(li);
     });
 }
