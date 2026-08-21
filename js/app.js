@@ -213,7 +213,7 @@ function acceptJob(team) {
     gameState.teamId = team.id;
     
     // Generate the roster based on team prestige
-    gameState.roster = generateTeamRoster(team.prestige);
+    gameState.roster = team.roster;
     
     // NEW: Generate the full 38-week schedule for the league!
     gameState.schedule = generateSeasonSchedule(gameState.leagueTeams, conferences);
