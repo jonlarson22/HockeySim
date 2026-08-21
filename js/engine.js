@@ -7,6 +7,8 @@ import {
     generateNationalTournament 
 } from './tournaments.js';
 
+import { generateProspectPool, calculateRecruitingPoints } from './recruiting.js';
+
 // Helper to generate a random number within a range
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
