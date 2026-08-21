@@ -77,10 +77,13 @@ function generatePlayer(position, teamPrestige) {
         lastName: getRandomLastName(),
         position: position,
         year: year,
-        overall: overall, // NEW OVR PROPERTY
+        overall: overall, 
         potential: potential,
         stats: stats,
-        status: 'Active' 
+        status: 'Active Roster', // Updated from 'Active' to match dropdown exactly
+        eligibilityYears: 4,     // NEW
+        redshirtUsed: false,     // NEW
+        injuryWeeks: 0           // NEW
     };
 }
 
@@ -360,14 +363,25 @@ export function simulateWeek(gameState) {
     }
 });
     
-    // --- IN-SEASON PLAYER PROGRESSION ---
+    // --- INJURY MANAGEMENT & PROGRESSION ---
     if (gameState.roster) {
         const coachDev = gameState.coach.skills.development || 5;
         const allPlayers = [...gameState.roster.goalies, ...gameState.roster.defensemen, ...gameState.roster.forwards];
         
         allPlayers.forEach(player => {
-            // Base 1% chance, plus up to 4% based on coach development skill (max 30)
-            const progressionChance = 0.01 + ((coachDev / 30) * 0.04); 
+            // 1. INJURIES
+            if (player.injuryWeeks > 0) {
+                player.injuryWeeks--; // Heal over time
+            } else if (player.status === 'Active Roster' && Math.random() < 0.02) {
+                // 2% chance for an active player to get hurt (1 to 4 weeks)
+                player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
+                // Auto-move to Practice Squad to force the coach to make a roster move
+                player.status = 'Practice Squad'; 
+            }
+
+            // 2. IN-SEASON PROGRESSION
+            // Base 15% chance, plus up to 20% based on coach development skill (max 30)
+            const progressionChance = 0.15 + ((coachDev / 30) * 0.20); 
             
             if (Math.random() < progressionChance) {
                 // Pick a random attribute to upgrade
