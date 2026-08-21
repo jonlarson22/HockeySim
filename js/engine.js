@@ -79,7 +79,7 @@ function generatePlayer(position, teamPrestige) {
     }
     const overall = Math.round(statTotal / statCount);
 
-    const potential = randomInt(55, 95);
+    let potential = randomInt(55, 95);
     if (overall >= potential) {
         potential = overall + randomInt(1, 6); 
         if (potential > 99) potential = 99;
