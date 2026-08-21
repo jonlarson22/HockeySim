@@ -395,7 +395,11 @@ function renderRoster(sortBy = 'overall') {
         });
     };
 
-    // Helper to generate a row
+    // Check if we are past the non-conference schedule
+    const isLocked = gameState.currentWeek > 10;
+    const lockAttr = isLocked ? 'disabled title="Rosters locked for conference play"' : '';
+
+    // Update the renderPlayerRow helper to include the lockAttr
     const renderPlayerRow = (p, roleOptions) => `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a2a; margin-bottom: 5px; border-radius: 4px;">
             <a href="#" class="player-link" data-id="${p.id}" style="color: var(--accent); text-decoration: none; display: flex; align-items: center;">
@@ -403,7 +407,7 @@ function renderRoster(sortBy = 'overall') {
                 <span style="background: #1e3a8a; color: #93c5fd; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; border: 1px solid #3b82f6;">POT: ${p.potential}</span>
                 ${p.firstName} ${p.lastName} <span style="color:#aaa; font-size:0.9em; margin-left: 5px;">(${p.year})</span>
             </a>
-            <select class="role-select" data-id="${p.id}">
+            <select class="role-select" data-id="${p.id}" ${lockAttr} style="${isLocked ? 'background: #444; cursor: not-allowed;' : ''}">
                 ${roleOptions.map(opt => `<option value="${opt}" ${p.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
             </select>
         </div>
