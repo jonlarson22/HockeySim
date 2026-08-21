@@ -113,6 +113,30 @@ const btnNewGame = document.getElementById('btn-new-game');
 const btnSubmitCoach = document.getElementById('btn-submit-coach');
 const jobList = document.getElementById('job-list');
 
+function getScheduleLabel(weekNumber) {
+    if (weekNumber <= 10) {
+        return `Pre-Season Game ${weekNumber}`;
+    } else if (weekNumber <= 38) {
+        return `Conference Game ${weekNumber - 10}`;
+    } else if (weekNumber === 39) {
+        return `Conference Quarterfinals`;
+    } else if (weekNumber === 40) {
+        return `Conference Semifinals`;
+    } else if (weekNumber === 41) {
+        return `Conference Finals`;
+    } else if (weekNumber === 42) {
+        return `National Round of 16`;
+    } else if (weekNumber === 43) {
+        return `National Quarterfinals`;
+    } else if (weekNumber === 44) {
+        return `National Semifinals`;
+    } else if (weekNumber === 45) {
+        return `National Championship`;
+    } else {
+        return `Offseason`;
+    }
+}
+
 // --- VIEW ROUTER ---
 function switchView(viewId) {
     // 1. Hide all screens
