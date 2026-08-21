@@ -514,10 +514,12 @@ export function processOffSeason(gameState) {
             // Apply a minor off-season attribute bump
             if (Math.random() < boostChance) {
                 const statKeys = Object.keys(player.stats);
-                const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
-                if (player.stats[randomStat] < 99) {
-                    player.stats[randomStat] += Math.floor(Math.random() * 3) + 1;
-                }
+                statKeys.forEach(stat => {
+                    // 50% chance to bump each individual stat by 1-3 points
+                    if (Math.random() < 0.50 && player.stats[stat] < 99) {
+                        player.stats[stat] += Math.floor(Math.random() * 3) + 1;
+                    }
+                });
                 
                 // Recalculate OVR
                 let statTotal = 0;
