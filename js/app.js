@@ -1,5 +1,7 @@
 import { teams as baseTeams, conferences } from './data.js';
-import { generateTeamRoster, initializeLeague, generateSeasonSchedule, simulateWeek } from './engine.js';
+import { generateTeamRoster, initializeLeague, generateSeasonSchedule, simulateWeek, processOffSeason } from './engine.js';
+import { generateProspectPool, calculateRecruitingPoints, processRecruitingWeek, getScoutedGrade, getPotentialDescriptor } from './recruiting.js';
+import { saveGameState, loadGameState, hasSavedGame } from './storage.js';
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
@@ -752,6 +754,160 @@ btnViewBracket.addEventListener('click', () => {
 document.getElementById('btn-back-bracket').onclick = () => switchView('view-dashboard');
 
 document.getElementById('btn-back-schedule').onclick = () => switchView('view-dashboard');
+
+    // Add user allocation tracking to state
+    let userAllocatedPoints = {}; // { prospectId: pointsSpent }
+    
+    // Initialize Offseason & Recruiting Flow
+    function startOffseasonRecruiting() {
+        processOffSeason(gameState); // Clean up seniors & progress returning players
+        
+        gameState.recruitingWeek = 1;
+        gameState.prospectPool = generateProspectPool(gameState);
+        userAllocatedPoints = {};
+        
+        renderRecruitingHub();
+        switchView('view-recruiting');
+    }
+    
+        function renderRecruitingHub(filterTargetsOnly = false, posFilter = 'ALL') {
+            const pool = gameState.prospectPool || [];
+            const userTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+            const totalBudget = calculateRecruitingPoints(userTeam, gameState.coach);
+            
+            // Calculate spent points
+            const spentPoints = Object.values(userAllocatedPoints).reduce((a, b) => a + b, 0);
+            const pointsLeft = totalBudget - spentPoints;
+        
+            document.getElementById('recruiting-week-num').textContent = gameState.recruitingWeek;
+            document.getElementById('recruiting-points-left').textContent = pointsLeft;
+        
+            const listContainer = document.getElementById('recruiting-prospect-list');
+            listContainer.innerHTML = "";
+        
+            // Filter prospects
+            const displayedProspects = pool.filter(p => {
+                if (p.committedTeamId) return false; // Hide signed players from active board
+                if (filterTargetsOnly && !p.isUserTarget) return false;
+                if (posFilter !== 'ALL' && p.position !== posFilter) return false;
+                return true;
+            });
+        
+            if (displayedProspects.length === 0) {
+                listContainer.innerHTML = `<p style="color: #888;">No prospects match the selected filter.</p>`;
+                return;
+            }
+        
+            displayedProspects.forEach(p => {
+                const allocated = userAllocatedPoints[p.id] || 0;
+                const myInterest = p.interest[gameState.teamId] || 0;
+                const targetBadge = p.isUserTarget ? `<span style="background: var(--accent); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: bold; margin-right: 5px;">TARGETED</span>` : '';
+        
+                const card = document.createElement('div');
+                card.style.cssText = "background: #2a2a2a; padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;";
+                
+                card.innerHTML = `
+                    <div>
+                        <div>
+                            ${targetBadge}
+                            <strong>${p.firstName} ${p.lastName}</strong> (${p.position})
+                        </div>
+                        <div style="font-size: 0.85em; color: #aaa; margin-top: 4px;">
+                            Grade: <strong>${getScoutedGrade(p.overall)}</strong> | Pot: <strong>${getPotentialDescriptor(p.potential)}</strong> | Total Interest: <span style="color: #4ade80;">${myInterest} pts</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button class="secondary btn-sub-pt" data-id="${p.id}" style="width: 30px; padding: 4px;">-</button>
+                        <input type="number" class="rec-pt-input" data-id="${p.id}" value="${allocated}" min="0" max="${pointsLeft + allocated}" style="width: 60px; text-align: center; padding: 4px;">
+                        <button class="secondary btn-add-pt" data-id="${p.id}" style="width: 30px; padding: 4px;">+</button>
+                    </div>
+                `;
+        
+                // Input listeners
+                card.querySelector('.btn-add-pt').onclick = () => {
+                    if (pointsLeft >= 10) {
+                        userAllocatedPoints[p.id] = (userAllocatedPoints[p.id] || 0) + 10;
+                        p.isUserTarget = true;
+                        renderRecruitingHub(filterTargetsOnly, posFilter);
+                    }
+                };
+        
+                card.querySelector('.btn-sub-pt').onclick = () => {
+                    if ((userAllocatedPoints[p.id] || 0) >= 10) {
+                        userAllocatedPoints[p.id] -= 10;
+                        renderRecruitingHub(filterTargetsOnly, posFilter);
+                    }
+                };
+        
+                listContainer.appendChild(card);
+            });
+        }
+        
+        // Recruiting Submission Listener
+        document.getElementById('btn-submit-recruiting').onclick = () => {
+            const recapLogs = processRecruitingWeek(gameState, userAllocations);
+            renderRecruitingRecap(recapLogs);
+            switchView('view-recruiting-recap');
+        };
+        
+        function renderRecruitingRecap(recapLogs) {
+            const recapContainer = document.getElementById('recruiting-recap-list');
+            recapContainer.innerHTML = "";
+        
+            if (recapLogs.length === 0) {
+                recapContainer.innerHTML = `<p style="color: #aaa;">No major commitment updates on your targets this week.</p>`;
+            } else {
+                recapLogs.forEach(log => {
+                    let color = '#aaa';
+                    let msg = '';
+        
+                    if (log.status === 'SIGNED') {
+                        color = '#4ade80';
+                        msg = `<strong>${log.prospect.firstName} ${log.prospect.lastName}</strong> has committed to <strong>${log.schoolName}</strong>!`;
+                    } else if (log.status === 'LOST') {
+                        color = '#f87171';
+                        msg = `<strong>${log.prospect.firstName} ${log.prospect.lastName}</strong> signed with <strong>${log.schoolName}</strong>.`;
+                    } else {
+                        msg = `<strong>${log.prospect.firstName} ${log.prospect.lastName}</strong> remains undecided. Top School: ${log.topSchool}`;
+                    }
+        
+                    recapContainer.innerHTML += `
+                        <div style="background: #222; padding: 10px; border-radius: 4px; border-left: 4px solid ${color};">
+                            ${msg}
+                        </div>
+                    `;
+                });
+            }
+        }
+        
+        // Continue Button after Recruiting Recap
+        document.getElementById('btn-continue-recruiting').onclick = () => {
+            userAllocatedPoints = {}; // Reset weekly allocations
+            gameState.recruitingWeek++;
+        
+            if (gameState.recruitingWeek > 5) {
+                // Finalize offseason: Add signed prospects to team rosters
+                const pool = gameState.prospectPool || [];
+                pool.filter(p => p.committedTeamId === gameState.teamId).forEach(prospect => {
+                    if (prospect.position === 'G') gameState.roster.goalies.push(prospect);
+                    else if (prospect.position === 'D') gameState.roster.defensemen.push(prospect);
+                    else gameState.roster.forwards.push(prospect);
+                });
+        
+                // Advance Season Year & Generate New Schedule
+                gameState.year++;
+                gameState.currentWeek = 1;
+                gameState.schedule = generateSeasonSchedule(gameState.leagueTeams, conferences);
+                
+                saveGameState(gameState);
+                alert(`Recruiting complete! The ${gameState.year} season is now underway.`);
+                initDashboard();
+                switchView('view-dashboard');
+            } else {
+                renderRecruitingHub();
+                switchView('view-recruiting');
+            }
+        };
 
 // Boot up app on the Main Menu
 switchView('view-main-menu');
