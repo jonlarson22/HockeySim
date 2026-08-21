@@ -487,5 +487,59 @@ export function simulateWeek(gameState) {
     if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
     if (gameState.currentWeek === 42) generateNationalTournament(gameState);
 
-    return true;
+export function processOffSeason(gameState) {
+    const coachDev = gameState.coach.skills.development || 5;
+
+    gameState.leagueTeams.forEach(team => {
+        // 1. Graduation: Filter out Seniors
+        team.roster.forwards = team.roster.forwards.filter(p => p.year !== 'Sr');
+        team.roster.defensemen = team.roster.defensemen.filter(p => p.year !== 'Sr');
+        team.roster.goalies = team.roster.goalies.filter(p => p.year !== 'Sr');
+
+        const allReturning = [...team.roster.forwards, ...team.roster.defensemen, ...team.roster.goalies];
+
+        // 2. Progression & Year Advancement
+        allReturning.forEach(player => {
+            // Off-season progression scales with play time and coach development skill
+            let boostChance = 0;
+            if (player.status === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
+            else if (player.status === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
+            else if (player.status === 'Redshirt') {
+                boostChance = 0.20 + (coachDev * 0.01);
+                player.redshirtUsed = true; 
+            }
+
+            // Apply a minor off-season attribute bump
+            if (Math.random() < boostChance) {
+                const statKeys = Object.keys(player.stats);
+                const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                if (player.stats[randomStat] < 99) {
+                    player.stats[randomStat] += Math.floor(Math.random() * 3) + 1;
+                }
+                
+                // Recalculate OVR
+                let statTotal = 0;
+                for (let key in player.stats) {
+                    statTotal += player.stats[key];
+                }
+                player.overall = Math.round(statTotal / statKeys.length);
+            }
+
+            // Advance Class Year
+            if (player.status !== 'Redshirt') {
+                if (player.year === 'Jr') player.year = 'Sr';
+                if (player.year === 'So') player.year = 'Jr';
+                if (player.year === 'Fr') player.year = 'So';
+                player.eligibilityYears--;
+            } else {
+                // If they redshirted, they remain their current class year but lose the Redshirt status
+                player.status = 'Practice Squad'; 
+            }
+            
+            // Reset injury weeks for the new season
+            player.injuryWeeks = 0;
+        });
+    });
+
+    return true; // Signals cleanup is done
 }
