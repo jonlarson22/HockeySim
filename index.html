@@ -136,6 +136,11 @@
                         <button id="btn-view-roster" class="primary" style="width: 100%; margin-bottom: 10px;">View Roster</button>
                         <button id="btn-coach-tree" class="secondary" style="width: 100%;">Coach Profile</button>
                     </div>
+
+                    <div class="dashboard-panel">
+                        <h2>Postseason</h2>
+                        <button id="btn-view-bracket" class="primary" style="width: 100%;">Tournament Bracket</button>
+                    </div>
                 </div>
 
                 <!-- Right Column: League Context -->
@@ -234,6 +239,17 @@
             
                 <div id="recap-results-list" style="display: flex; flex-direction: column; gap: 10px;">
                     <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TOURNAMENT BRACKET SCREEN -->
+        <section id="view-bracket" class="view hidden">
+            <div class="dashboard-panel">
+                <h2>Conference Tournament</h2>
+                <button id="btn-back-bracket" class="secondary" style="margin-bottom: 15px;">Back to Dashboard</button>
+                <div id="bracket-container" style="background: #222; padding: 15px; border-radius: 8px;">
+                    <!-- Generated via JS -->
                 </div>
             </div>
         </section>
