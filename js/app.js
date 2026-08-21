@@ -180,6 +180,18 @@ function switchView(viewId) {
     }
 }
 
+document.getElementById('btn-load-game').addEventListener('click', () => {
+    if (hasSavedGame()) {
+        gameState = loadGameState();
+        
+        // Re-initialize the UI with loaded data
+        initDashboard();
+        switchView('view-dashboard');
+    } else {
+        alert("No save data found.");
+    }
+});
+
 // --- SCREEN LOGIC & EVENT LISTENERS ---
 
 // 1. Main Menu -> Coach Creation
@@ -870,10 +882,10 @@ document.getElementById('btn-back-schedule').onclick = () => switchView('view-da
         
         // Recruiting Submission Listener
         document.getElementById('btn-submit-recruiting').onclick = () => {
-            const recapLogs = processRecruitingWeek(gameState, userAllocations);
-            renderRecruitingRecap(recapLogs);
-            switchView('view-recruiting-recap');
-        };
+        const recapLogs = processRecruitingWeek(gameState, userAllocatedPoints); 
+        renderRecruitingRecap(recapLogs);
+        switchView('view-recruiting-recap');
+    };
         
         function renderRecruitingRecap(recapLogs) {
             const recapContainer = document.getElementById('recruiting-recap-list');
