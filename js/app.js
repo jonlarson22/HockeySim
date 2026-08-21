@@ -2,6 +2,31 @@ import { teams as baseTeams, conferences } from './data.js';
 import { generateTeamRoster, initializeLeague, generateSeasonSchedule, simulateWeek, processOffSeason } from './engine.js';
 import { generateProspectPool, calculateRecruitingPoints, processRecruitingWeek, getScoutedGrade, getPotentialDescriptor } from './recruiting.js';
 import { saveGameState, loadGameState, hasSavedGame } from './storage.js';
+import { exportGameState, importGameState } from './storage.js';
+
+document.getElementById('btn-export-save').onclick = () => {
+    if (!exportGameState()) alert("No save data found to export.");
+};
+
+// Route the visible button click to the hidden file input
+document.getElementById('btn-import-trigger').onclick = () => {
+    document.getElementById('file-import-save').click();
+};
+
+// Handle the file once selected
+document.getElementById('file-import-save').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    importGameState(file, (success) => {
+        if (success) {
+            alert("Save imported successfully! Reloading game...");
+            location.reload(); // Quickest way to re-initialize with new data
+        } else {
+            alert("Invalid save file.");
+        }
+    });
+};
 
 // --- GAME STATE ---
 // This object will eventually be saved to localStorage
