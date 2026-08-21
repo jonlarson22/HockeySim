@@ -402,7 +402,15 @@ export function simulateWeek(gameState) {
         });
     }
 
-    // Advance the week
+    // Advance the week counter
     gameState.currentWeek++;
+
+    // TRIGGER TOURNAMENTS
+    if (gameState.currentWeek === 39) {
+        // Import generateConferenceQuarterfinals at the top of engine.js to call this
+        generateConferenceQuarterfinals(gameState);
+    }
+    // We will add triggers for week 40 (Semis) and 41 (Finals) next!
+
     return true;
 }
