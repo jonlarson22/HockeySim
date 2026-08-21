@@ -297,6 +297,61 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
     return schedule;
 }
 
+function getActivePlayers(players) {
+    return players.filter(p => p.status === 'Active Roster').sort((a, b) => b.overall - a.overall);
+}
+
+function calculateTeamRatings(teamId, gameState) {
+    const team = gameState.leagueTeams.find(t => t.id === teamId);
+    
+    const activeForwards = getActivePlayers(team.roster.forwards);
+    const activeDefense = getActivePlayers(team.roster.defensemen);
+    const activeGoalies = getActivePlayers(team.roster.goalies);
+
+    // Forwards (Top 12) - 40/30/20/10 split
+    let offOvr = 0;
+    if (activeForwards.length >= 12) {
+        const g1 = (activeForwards[0].overall + activeForwards[1].overall + activeForwards[2].overall) / 3;
+        const g2 = (activeForwards[3].overall + activeForwards[4].overall + activeForwards[5].overall) / 3;
+        const g3 = (activeForwards[6].overall + activeForwards[7].overall + activeForwards[8].overall) / 3;
+        const g4 = (activeForwards[9].overall + activeForwards[10].overall + activeForwards[11].overall) / 3;
+        offOvr = (g1 * 0.40) + (g2 * 0.30) + (g3 * 0.20) + (g4 * 0.10);
+    } else {
+        // Fallback just in case a team has massive injury issues
+        offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
+    }
+
+    // Defense (Top 6) - 40/35/25 split
+    let defOvr = 0;
+    if (activeDefense.length >= 6) {
+        const g1 = (activeDefense[0].overall + activeDefense[1].overall) / 2;
+        const g2 = (activeDefense[2].overall + activeDefense[3].overall) / 2;
+        const g3 = (activeDefense[4].overall + activeDefense[5].overall) / 2;
+        defOvr = (g1 * 0.40) + (g2 * 0.35) + (g3 * 0.25);
+    } else {
+        defOvr = activeDefense.reduce((sum, p) => sum + p.overall, 0) / (activeDefense.length || 1);
+    }
+
+    // Goalie (Top 1)
+    let goalieOvr = activeGoalies.length > 0 ? activeGoalies[0].overall : 50;
+
+    // Coach Boosts: Calculate 3 * (skill / 30)
+    let coachOffBoost = 0;
+    let coachDefBoost = 0;
+    
+    if (teamId === gameState.teamId) {
+        coachOffBoost = 3 * ((gameState.coach.skills.offense || 3) / 30);
+        coachDefBoost = 3 * ((gameState.coach.skills.defense || 3) / 30);
+    } else {
+        // AI coach skill scales roughly with prestige (e.g., 90 prestige = ~27 skill)
+        const estimatedSkill = (team.prestige / 100) * 30;
+        coachOffBoost = 3 * (estimatedSkill / 30);
+        coachDefBoost = 3 * (estimatedSkill / 30);
+    }
+
+    return { offense: offOvr, defense: defOvr, goalie: goalieOvr, coachOffBoost, coachDefBoost };
+}
+
 // --- SIMULATION ENGINE ---
 export function simulateWeek(gameState) {
     const currentWeekIndex = gameState.currentWeek - 1;
@@ -309,38 +364,40 @@ export function simulateWeek(gameState) {
     const weekGames = gameState.schedule[currentWeekIndex];
 
     weekGames.forEach(game => {
-    if (game.played) return;
+        if (game.played) return;
 
         const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
         const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-        const isConfGame = game.type === 'conf';
+        const isConfGame = game.type === 'conf' || game.type === 'conf_tourney';
 
-        // Basic simulation logic based on prestige difference
-        const prestigeDiff = homeTeam.prestige - awayTeam.prestige;
-        
-        // Base goals (0 to 4)
-        let homeGoals = Math.floor(Math.random() * 5);
-        let awayGoals = Math.floor(Math.random() * 5);
+        // 1. Get Weighted Ratings
+        const homeRatings = calculateTeamRatings(homeTeam.id, gameState);
+        const awayRatings = calculateTeamRatings(awayTeam.id, gameState);
 
-        // Home ice advantage
-        homeGoals += 1;
+        // 2. Calculate Unit Scores 
+        // Home ice grants a flat +2 to both Offense and Defense overall scores
+        const homeOffenseScore = homeRatings.offense + homeRatings.coachOffBoost + 2; 
+        // Defense is a 50/50 blend of the blueliners and the goalie
+        const homeDefenseScore = (homeRatings.defense * 0.5) + (homeRatings.goalie * 0.5) + homeRatings.coachDefBoost + 2;
 
-        // Prestige modifiers
-        if (prestigeDiff > 10) homeGoals += 1;
-        if (prestigeDiff > 30) homeGoals += 1;
-        if (prestigeDiff < -10) awayGoals += 1;
-        if (prestigeDiff < -30) awayGoals += 1;
+        const awayOffenseScore = awayRatings.offense + awayRatings.coachOffBoost;
+        const awayDefenseScore = (awayRatings.defense * 0.5) + (awayRatings.goalie * 0.5) + awayRatings.coachDefBoost;
 
-        // Handle Hockey Ties (Overtime)
+        // 3. Matchup Engine (Base Goals = 2, Scaling Factor = 8)
+        const SCALING_FACTOR = 8;
+        let homeExpectedGoals = 2 + ((homeOffenseScore - awayDefenseScore) / SCALING_FACTOR);
+        let awayExpectedGoals = 2 + ((awayOffenseScore - homeDefenseScore) / SCALING_FACTOR);
+
+        // Add variance (-1.5 to +1.5 goals) so games aren't entirely predictable
+        let homeGoals = Math.max(0, Math.round(homeExpectedGoals + (Math.random() * 3 - 1.5)));
+        let awayGoals = Math.max(0, Math.round(awayExpectedGoals + (Math.random() * 3 - 1.5)));
+
+        // Handle Overtime
         let isOT = false;
         if (homeGoals === awayGoals) {
             isOT = true;
-            // Coin flip for the OT winner
-            if (Math.random() > 0.5) {
-                homeGoals += 1;
-            } else {
-                awayGoals += 1;
-            }
+            if (Math.random() > 0.5) homeGoals++;
+            else awayGoals++;
         }
 
         // Save results to the game object
