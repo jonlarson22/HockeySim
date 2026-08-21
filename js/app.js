@@ -909,5 +909,19 @@ document.getElementById('btn-back-schedule').onclick = () => switchView('view-da
             }
         };
 
+document.getElementById('btn-debug-sim-season').addEventListener('click', () => {
+    // Replace 35 with whatever week triggers your postseason/offseason
+    const OFFSEASON_START_WEEK = 35; 
+    
+    while (gameState.currentWeek < OFFSEASON_START_WEEK) {
+        simulateWeek(gameState);
+        // Ensure currentWeek increments here or inside simulateWeek()
+    }
+    
+    saveGameState(gameState);
+    initDashboard(); // Refresh your UI
+    alert("Simulated straight to the offseason!");
+});
+
 // Boot up app on the Main Menu
 switchView('view-main-menu');
