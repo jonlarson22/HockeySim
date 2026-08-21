@@ -359,6 +359,35 @@ export function simulateWeek(gameState) {
         }
     }
 });
+    
+    // --- IN-SEASON PLAYER PROGRESSION ---
+    if (gameState.roster) {
+        const coachDev = gameState.coach.skills.development || 5;
+        const allPlayers = [...gameState.roster.goalies, ...gameState.roster.defensemen, ...gameState.roster.forwards];
+        
+        allPlayers.forEach(player => {
+            // Base 1% chance, plus up to 4% based on coach development skill (max 30)
+            const progressionChance = 0.01 + ((coachDev / 30) * 0.04); 
+            
+            if (Math.random() < progressionChance) {
+                // Pick a random attribute to upgrade
+                const statKeys = Object.keys(player.stats);
+                const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                
+                if (player.stats[randomStat] < 99) {
+                    player.stats[randomStat]++;
+                    
+                    // Recalculate OVR
+                    let statTotal = 0;
+                    for (let key in player.stats) {
+                        statTotal += player.stats[key];
+                    }
+                    player.overall = Math.round(statTotal / statKeys.length);
+                }
+            }
+        });
+    }
+
     // Advance the week
     gameState.currentWeek++;
     return true;
