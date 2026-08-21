@@ -115,7 +115,7 @@ const jobList = document.getElementById('job-list');
 
 function getScheduleLabel(weekNumber) {
     if (weekNumber <= 10) {
-        return `Pre-Season Game ${weekNumber}`;
+        return `Non-Conference Game ${weekNumber}`;
     } else if (weekNumber <= 38) {
         return `Conference Game ${weekNumber - 10}`;
     } else if (weekNumber === 39) {
