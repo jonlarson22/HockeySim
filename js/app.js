@@ -296,11 +296,11 @@ function updateStandingsTable(confId) {
         }
         
         row.innerHTML = `
-            <td>${team.name}</td>
-            <td>${confW}-${confL}-${confOtl}</td>
-            <td>${confPts}</td>
-            <td style="color: #aaa;">${w}-${l}-${otl}</td>
-            <td style="color: #aaa;">${ovrPts}</td>
+            <td style="white-space: nowrap;">${team.name}</td>
+            <td style="text-align: center; white-space: nowrap;">${confW}-${confL}-${confOtl}</td>
+            <td style="text-align: center;">${confPts}</td>
+            <td style="text-align: center; color: #aaa; white-space: nowrap;">${w}-${l}-${otl}</td>
+            <td style="text-align: center; color: #aaa;">${ovrPts}</td>
         `;
         tbody.appendChild(row);
     });
