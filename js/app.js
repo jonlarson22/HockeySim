@@ -753,7 +753,7 @@ function renderBracket() {
             html += `<h4 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h4>`;
 
             if (natGames.length === 0) {
-                html += `<p style="color: #888;">Matchups not yet generated.</p>';
+                html += `<p style="color: #888;">Matchups not yet generated.</p>`;
             } else {
                 natGames.forEach(game => {
                     const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
