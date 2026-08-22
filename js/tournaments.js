@@ -1,3 +1,5 @@
+import { conferences } from './data.js';
+
 // Helper to sort teams by conference points, then overall points
 function getConferenceStandings(leagueTeams, confId) {
     return leagueTeams
@@ -17,7 +19,7 @@ function getConferenceStandings(leagueTeams, confId) {
 export function generateConferenceQuarterfinals(gameState) {
     let quarterfinalGames = [];
 
-    gameState.conferences.forEach(conf => {
+    conferences.forEach(conf => {
         const standings = getConferenceStandings(gameState.leagueTeams, conf.id);
         const top8 = standings.slice(0, 8);
 
@@ -46,7 +48,7 @@ export function generateConferenceSemifinals(gameState) {
     let semiGames = [];
     const quarterGames = gameState.schedule[38]; // Index 38 is Week 39
 
-    gameState.conferences.forEach(conf => {
+    conferences.forEach(conf => {
         const confQuarters = quarterGames.filter(g => g.confId === conf.id);
         if(confQuarters.length !== 4) return;
 
@@ -73,7 +75,7 @@ export function generateConferenceFinals(gameState) {
     let finalGames = [];
     const semiGames = gameState.schedule[39]; // Index 39 is Week 40
 
-    gameState.conferences.forEach(conf => {
+    conferences.forEach(conf => {
         const confSemis = semiGames.filter(g => g.confId === conf.id);
         if(confSemis.length !== 2) return;
 
