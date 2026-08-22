@@ -731,53 +731,96 @@ function renderBracket() {
     const confId = myTeam ? myTeam.confId : conferences[0].id;
     const confName = conferences.find(c => c.id === confId).name;
 
-    let html = `<h3>${confName} Championship Bracket</h3>`;
+    let html = "";
 
-    // The weeks the conference tournament takes place
-    const tournamentRounds = [
-        { week: 39, name: "Quarterfinals" },
-        { week: 40, name: "Semifinals" },
-        { week: 41, name: "Finals" }
-    ];
+    // If we are past conference tournaments, show National Bracket
+    if (gameState.currentWeek >= 42) {
+        html += `<h3>National Championship Bracket</h3>`;
+        const nationalRounds = [
+            { week: 42, name: "Round of 16" },
+            { week: 43, name: "Quarterfinals" },
+            { week: 44, name: "Semifinals" },
+            { week: 45, name: "National Championship" }
+        ];
 
-    let tournamentStarted = false;
+        nationalRounds.forEach(round => {
+            const roundGames = gameState.schedule[round.week - 1];
+            if (!roundGames) return;
 
-    tournamentRounds.forEach(round => {
-        const roundGames = gameState.schedule[round.week - 1]; 
-        if (!roundGames) return; 
+            // Find national games (adjust tag filter depending on how your engine tags national games)
+            const natGames = roundGames.filter(g => g.type === 'national_tourney' || g.isNational);
+            
+            html += `<h4 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h4>`;
 
-        // Find games matching this conference and the tournament tag we set in tournaments.js
-        const confGames = roundGames.filter(g => g.confId === confId && g.type === 'conf_tourney');
-        if (confGames.length === 0) return;
-
-        tournamentStarted = true;
-        html += `<h4 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h4>`;
-
-        confGames.forEach(game => {
-            const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
-            const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-
-            if (game.played) {
-                // Determine winner logic
-                const winner = game.homeScore > game.awayScore ? homeTeam.name : awayTeam.name;
-                const otText = game.ot ? " (OT)" : "";
-                
-                html += `
-                    <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between;">
-                        <span>${awayTeam.name} (${game.awayScore}) @ ${homeTeam.name} (${game.homeScore})${otText}</span>
-                        <strong style="color: #4ade80;">${winner} Advances</strong>
-                    </div>`;
+            if (natGames.length === 0) {
+                html += `<p style="color: #888;">Matchups not yet generated.</p>';
             } else {
-                html += `
-                    <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; color: #aaa;">
-                        ${awayTeam.name} @ ${homeTeam.name}
-                    </div>`;
+                natGames.forEach(game => {
+                    const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+                    const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+                    
+                    if (game.played) {
+                        const winner = game.homeScore > game.awayScore ? homeTeam.name : awayTeam.name;
+                        const otText = game.ot ? " (OT)" : "";
+                        html += `
+                            <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between;">
+                                <span>${awayTeam.name} (${game.awayScore}) @ ${homeTeam.name} (${game.homeScore})${otText}</span>
+                                <strong style="color: #4ade80;">${winner} Advances</strong>
+                            </div>`;
+                    } else {
+                        html += `
+                            <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; color: #aaa;">
+                                ${awayTeam ? awayTeam.name : "TBD"} @ ${homeTeam ? homeTeam.name : "TBD"}
+                            </div>`;
+                    }
+                });
             }
         });
-    });
 
-    if (!tournamentStarted) {
-        html += `<p style="color: #888; margin-top: 10px;">The regular season is still underway. The bracket will be revealed after Week 38.</p>`;
+    } else {
+        // Conference Tournaments (Weeks 39-41)
+        html += `<h3>${confName} Championship Bracket</h3>`;
+        const tournamentRounds = [
+            { week: 39, name: "Quarterfinals" },
+            { week: 40, name: "Semifinals" },
+            { week: 41, name: "Finals" }
+        ];
+
+        let tournamentStarted = false;
+        tournamentRounds.forEach(round => {
+            const roundGames = gameState.schedule[round.week - 1];
+            if (!roundGames) return;
+
+            const confGames = roundGames.filter(g => g.confId === confId && g.type === 'conf_tourney');
+            if (confGames.length === 0) return;
+
+            tournamentStarted = true;
+            html += `<h4 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h4>`;
+
+            confGames.forEach(game => {
+                const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+                const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+
+                if (game.played) {
+                    const winner = game.homeScore > game.awayScore ? homeTeam.name : awayTeam.name;
+                    const otText = game.ot ? " (OT)" : "";
+                    html += `
+                        <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between;">
+                            <span>${awayTeam.name} (${game.awayScore}) @ ${homeTeam.name} (${game.homeScore})${otText}</span>
+                            <strong style="color: #4ade80;">${winner} Advances</strong>
+                        </div>`;
+                } else {
+                    html += `
+                        <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; color: #aaa;">
+                            ${awayTeam.name} @ ${homeTeam.name}
+                        </div>`;
+                }
+            });
+        });
+
+        if (!tournamentStarted) {
+            html += `<p style="color: #888; margin-top: 10px;">The regular season is still underway. The bracket will be revealed after Week 38.</p>`;
+        }
     }
 
     container.innerHTML = html;
