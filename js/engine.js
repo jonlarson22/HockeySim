@@ -4,7 +4,10 @@ import {
     generateConferenceQuarterfinals, 
     generateConferenceSemifinals, 
     generateConferenceFinals,
-    generateNationalTournament 
+    generateNationalTournament,
+    generateNationalQuarterfinals,
+    generateNationalSemifinals,
+    generateNationalChampionship
 } from './tournaments.js';
 
 import { generateProspectPool, calculateRecruitingPoints } from './recruiting.js';
@@ -488,6 +491,11 @@ export function simulateWeek(gameState) {
     if (gameState.currentWeek === 40) generateConferenceSemifinals(gameState);
     if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
     if (gameState.currentWeek === 42) generateNationalTournament(gameState);
+    if (gameState.currentWeek === 43) generateNationalQuarterfinals(gameState);
+    if (gameState.currentWeek === 44) generateNationalSemifinals(gameState);
+    if (gameState.currentWeek === 45) generateNationalChampionship(gameState);
+
+    return true;
 }
 
 export function processOffSeason(gameState) {
