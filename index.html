@@ -250,7 +250,10 @@
         <!-- TOURNAMENT BRACKET SCREEN -->
         <section id="view-bracket" class="view hidden">
             <div class="dashboard-panel">
-                <h2>Conference Tournament</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Tournament Bracket</h2>
+                    <button id="btn-sim-week-bracket" class="primary" style="width: auto; padding: 8px 16px;">Simulate Week</button>
+                </div>
                 <button id="btn-back-bracket" class="secondary" style="margin-bottom: 15px;">Back to Dashboard</button>
                 <div id="bracket-container" style="background: #222; padding: 15px; border-radius: 8px;">
                     <!-- Generated via JS -->
@@ -258,6 +261,44 @@
             </div>
         </section>
 
+        <!-- SEASON RECAP SCREEN -->
+        <section id="view-season-recap" class="view hidden">
+            <div class="dashboard-panel">
+                <h2>Season Recap - <span id="recap-season-year">2026</span></h2>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                    <!-- Left Column: Season Results -->
+                    <div>
+                        <h3>Regular Season Record</h3>
+                        <p id="recap-season-record" style="font-size: 1.3em; color: var(--accent);">0-0-0</p>
+                        
+                        <h3 style="margin-top: 20px;">Conference Finish</h3>
+                        <p id="recap-conf-finish" style="font-size: 1.1em;">-- in Conference</p>
+                        
+                        <h3 style="margin-top: 20px;">National Ranking</h3>
+                        <p id="recap-nat-rank" style="font-size: 1.1em; color: var(--accent);">Unranked</p>
+                        <p id="recap-peak-rank" style="font-size: 0.9em; color: #aaa;">Peak Ranking: --</p>
+                    </div>
+                    
+                    <!-- Right Column: Tournament Results -->
+                    <div>
+                        <h3>Conference Tournament</h3>
+                        <p id="recap-conf-tourney" style="font-size: 0.9em;">--</p>
+                        
+                        <h3 style="margin-top: 20px;">National Tournament</h3>
+                        <p id="recap-nat-tourney" style="font-size: 0.9em;">--</p>
+                        
+                        <h3 style="margin-top: 20px;">Graduating Players</h3>
+                        <div id="recap-graduates" style="font-size: 0.9em; max-height: 150px; overflow-y: auto;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="btn-proceed-to-offseason" class="primary" style="width: 100%; margin-top: 20px;">Proceed to Offseason</button>
+            </div>
+        </section>
+        
         <!-- 7. RECRUITING HUB SCREEN -->
         <section id="view-recruiting" class="view hidden">
             <div class="dashboard-panel">
