@@ -725,61 +725,71 @@ const btnViewBracket = document.getElementById('btn-view-bracket');
 
 function renderBracket() {
     const container = document.getElementById('bracket-container');
-    container.innerHTML = "";
-
     const myTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
     const confId = myTeam ? myTeam.confId : conferences[0].id;
     const confName = conferences.find(c => c.id === confId).name;
 
     let html = "";
+    let isBeyondConference = gameState.currentWeek >= 42;
 
-    // If we are past conference tournaments, show National Bracket
-    if (gameState.currentWeek >= 42) {
-        html += `<h3>National Championship Bracket</h3>`;
+    // Dynamic header
+    if (isBeyondConference) {
+        html += `<h2>National Championship Bracket</h2>`;
+    } else {
+        html += `<h2>${confName} Championship Bracket</h2>`;
+    }
+
+    if (isBeyondConference) {
+        // National tournament logic with seeds
         const nationalRounds = [
-            { week: 42, name: "Round of 16" },
-            { week: 43, name: "Quarterfinals" },
-            { week: 44, name: "Semifinals" },
-            { week: 45, name: "National Championship" }
+            { week: 42, name: "Round of 16", seedPairs: [[1,16],[2,15],[3,14],[4,13],[5,12],[6,11],[7,10],[8,9]] },
+            { week: 43, name: "Quarterfinals", seedPairs: [[1,8],[2,7],[3,6],[4,5]] },
+            { week: 44, name: "Semifinals", seedPairs: [[1,4],[2,3]] },
+            { week: 45, name: "Championship", seedPairs: [[1,2]] }
         ];
 
         nationalRounds.forEach(round => {
             const roundGames = gameState.schedule[round.week - 1];
             if (!roundGames) return;
 
-            // Find national games (adjust tag filter depending on how your engine tags national games)
             const natGames = roundGames.filter(g => g.type === 'national_tourney' || g.isNational);
-            
-            html += `<h4 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h4>`;
+            if (natGames.length === 0) return;
 
-            if (natGames.length === 0) {
-                html += `<p style="color: #888;">Matchups not yet generated.</p>`;
-            } else {
-                natGames.forEach(game => {
-                    const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
-                    const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-                    
-                    if (game.played) {
-                        const winner = game.homeScore > game.awayScore ? homeTeam.name : awayTeam.name;
-                        const otText = game.ot ? " (OT)" : "";
-                        html += `
-                            <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between;">
-                                <span>${awayTeam.name} (${game.awayScore}) @ ${homeTeam.name} (${game.homeScore})${otText}</span>
-                                <strong style="color: #4ade80;">${winner} Advances</strong>
-                            </div>`;
-                    } else {
-                        html += `
-                            <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; color: #aaa;">
-                                ${awayTeam ? awayTeam.name : "TBD"} @ ${homeTeam ? homeTeam.name : "TBD"}
-                            </div>`;
-                    }
-                });
-            }
+            html += `<h3 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h3>`;
+
+            natGames.forEach((game, idx) => {
+                const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+                const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+                const seedPair = round.seedPairs[idx] || ['-', '-'];
+                
+                if (game.played) {
+                    const winner = game.homeScore > game.awayScore ? homeTeam.name : awayTeam.name;
+                    const otText = game.ot ? " (OT)" : "";
+                    html += `
+                        <div class="game-result-card">
+                            <div class="matchup-line">
+                                <span style="color: #aaa; min-width: 40px;">#${seedPair[1]}</span>
+                                <span class="team-name">${awayTeam.name}</span>
+                                <span class="team-score">${game.awayScore}</span>
+                            </div>
+                            <div class="matchup-line">
+                                <span style="color: #aaa; min-width: 40px;">#${seedPair[0]}</span>
+                                <span class="team-name">${homeTeam.name}</span>
+                                <span class="team-score">${game.homeScore}${otText}</span>
+                            </div>
+                            <div style="text-align: right; color: #4ade80; font-size: 0.85em; margin-top: 4px;">→ ${winner} Advances</div>
+                        </div>`;
+                } else {
+                    html += `
+                        <div class="game-result-card" style="color: #aaa;">
+                            <div class="matchup-line"><span>#${seedPair[1]}</span> <span class="team-name">${awayTeam.name}</span></div>
+                            <div class="matchup-line"><span>#${seedPair[0]}</span> <span class="team-name">${homeTeam.name}</span></div>
+                        </div>`;
+                }
+            });
         });
-
     } else {
-        // Conference Tournaments (Weeks 39-41)
-        html += `<h3>${confName} Championship Bracket</h3>`;
+        // Conference tournament logic
         const tournamentRounds = [
             { week: 39, name: "Quarterfinals" },
             { week: 40, name: "Semifinals" },
@@ -795,7 +805,7 @@ function renderBracket() {
             if (confGames.length === 0) return;
 
             tournamentStarted = true;
-            html += `<h4 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h4>`;
+            html += `<h3 style="margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent);">${round.name}</h3>`;
 
             confGames.forEach(game => {
                 const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
@@ -805,14 +815,22 @@ function renderBracket() {
                     const winner = game.homeScore > game.awayScore ? homeTeam.name : awayTeam.name;
                     const otText = game.ot ? " (OT)" : "";
                     html += `
-                        <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between;">
-                            <span>${awayTeam.name} (${game.awayScore}) @ ${homeTeam.name} (${game.homeScore})${otText}</span>
-                            <strong style="color: #4ade80;">${winner} Advances</strong>
+                        <div class="game-result-card">
+                            <div class="matchup-line">
+                                <span class="team-name">${awayTeam.name}</span>
+                                <span class="team-score">${game.awayScore}</span>
+                            </div>
+                            <div class="matchup-line">
+                                <span class="team-name">${homeTeam.name}</span>
+                                <span class="team-score">${game.homeScore}${otText}</span>
+                            </div>
+                            <div style="text-align: right; color: #4ade80; font-size: 0.85em; margin-top: 4px;">→ ${winner} Advances</div>
                         </div>`;
                 } else {
                     html += `
-                        <div style="padding: 10px; background: #333; margin-bottom: 5px; border-radius: 4px; color: #aaa;">
-                            ${awayTeam.name} @ ${homeTeam.name}
+                        <div class="game-result-card" style="color: #aaa;">
+                            <div class="matchup-line"><span class="team-name">${awayTeam.name}</span></div>
+                            <div class="matchup-line"><span class="team-name">${homeTeam.name}</span></div>
                         </div>`;
                 }
             });
@@ -831,7 +849,13 @@ btnViewBracket.addEventListener('click', () => {
     switchView('view-bracket');
 });
 
-document.getElementById('btn-back-bracket').onclick = () => switchView('view-dashboard');
+// Add Simulate Week button to bracket screen
+document.getElementById('view-bracket').addEventListener('click', function(e) {
+    if (e.target.textContent === 'Simulate Week') {
+        // Trigger the main simulate button click
+        document.getElementById('btn-sim-week').click();
+    }
+}, true);
 
 document.getElementById('btn-back-schedule').onclick = () => switchView('view-dashboard');
 
