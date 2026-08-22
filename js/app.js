@@ -948,7 +948,7 @@ document.getElementById('btn-back-schedule').onclick = () => switchView('view-da
 
 document.getElementById('btn-debug-sim-season').addEventListener('click', () => {
     // Replace 35 with whatever week triggers your postseason/offseason
-    const OFFSEASON_START_WEEK = 35; 
+    const OFFSEASON_START_WEEK = 38; 
     
     while (gameState.currentWeek < OFFSEASON_START_WEEK) {
         simulateWeek(gameState);
