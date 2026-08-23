@@ -13,7 +13,7 @@
         <div id="team-info" class="team-badge">No Team Assigned</div>
     </header>
     
-        <div id="player-modal" class="hidden" style="position: fixed; top: 10%; left: 50%; transform: translateX(-50%); background: #1e1e1e; padding: 20px; border: 2px solid var(--accent); z-index: 100; min-width: 300px;">
+        <div id="player-modal" class="hidden" style="position: fixed; top: 10%; left: 50%; transform: translateX(-50%); background: #1e1e1e; padding: 20px; border: 2px solid var(--accent); z-index: 1000; border-radius: 8px; max-width: 500px;">
             <h2 id="modal-name">Player Name</h2>
             <p id="modal-bio">Year | Position</p>
             <div id="modal-stats" style="margin: 15px 0;"></div>
@@ -230,7 +230,7 @@
         
         <!-- WEEKLY RECAP SCREEN -->
         <section id="view-weekly-recap" class="view hidden">
-            <div class="dashboard-panel">
+            <div class="dashboard-panel" style="max-width: 1200px; margin: 0 auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h2 id="recap-header" style="margin: 0;">Week 1 Results</h2>
                     <button id="btn-recap-continue" class="primary" style="margin: 0; width: auto; padding: 8px 20px;">Continue</button>
@@ -249,9 +249,9 @@
 
         <!-- TOURNAMENT BRACKET SCREEN -->
         <section id="view-bracket" class="view hidden">
-            <div class="dashboard-panel">
+            <div class="dashboard-panel" style="max-width: 1200px; margin: 0 auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h2 style="margin: 0;">Tournament Bracket</h2>
+                    <h2 id="bracket-title" style="margin: 0;">Tournament Bracket</h2>
                     <button id="btn-sim-week-bracket" class="primary" style="width: auto; padding: 8px 16px;">Simulate Week</button>
                 </div>
                 <button id="btn-back-bracket" class="secondary" style="margin-bottom: 15px;">Back to Dashboard</button>
@@ -263,7 +263,7 @@
 
         <!-- SEASON RECAP SCREEN -->
         <section id="view-season-recap" class="view hidden">
-            <div class="dashboard-panel">
+            <div class="dashboard-panel" style="max-width: 1000px; margin: 0 auto;">
                 <h2>Season Recap - <span id="recap-season-year">2026</span></h2>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
@@ -295,10 +295,10 @@
                     </div>
                 </div>
                 
-                <button id="btn-proceed-to-offseason" class="primary" style="width: 100%; margin-top: 20px;">Proceed to Offseason</button>
+                <button id="btn-proceed-to-offseason" class="primary" style="width: 100%; margin-top: 20px;">Proceed to Offseason Recruiting</button>
             </div>
         </section>
-        
+
         <!-- 7. RECRUITING HUB SCREEN -->
         <section id="view-recruiting" class="view hidden">
             <div class="dashboard-panel">
