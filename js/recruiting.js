@@ -175,7 +175,7 @@ export function preferenceMultiplier(p, userTeamId) {
 export function calculateRecruitingPoints(team, coach) {
     let points = 60;
     points += ((coach.skills?.recruiting || 3) * 8);
-    points += ((team.prestige || 50) * 1.5);
+    points += ((team.prestige || 50) * 2);
     points += ((team.wins || 0) * 3);
     return Math.floor(points);
 }
