@@ -124,15 +124,29 @@ export function generateNationalTournament(gameState) {
         return (overallPts * 12) + (winPct * 50) + (t.prestige * 0.5) - ((t.losses || 0) * 2);
     };
 
-    // 3. At-Large Bids: Fill the rest of the 32 slots
-    let sortedLeague = [...gameState.leagueTeams].sort((a, b) => getPollScore(b) - getPollScore(a));
+    // 3. At-Large Bids: 16 locks, then a 6-team "bubble" picked from the next
+    // 14 by weighted randomness — like a real committee, there are snubs
+    // and surprise inclusions every year.
+    let sortedLeague = [...gameState.leagueTeams]
+        .filter(t => !nationalTeams.some(nt => nt.id === t.id))
+        .sort((a, b) => getPollScore(b) - getPollScore(a));
 
-    for (let i = 0; i < sortedLeague.length; i++) {
-        if (nationalTeams.length >= 32) break;
-        if (!nationalTeams.some(t => t.id === sortedLeague[i].id)) {
-            nationalTeams.push(sortedLeague[i]);
-        }
+    const locks = sortedLeague.slice(0, 16);
+    const bubblePool = sortedLeague.slice(16, 30);
+    const bubblePicks = [];
+    const pool = [...bubblePool];
+    while (bubblePicks.length < 6 && pool.length) {
+        // Weight favors higher-ranked teams but leaves room for chaos.
+        const weights = pool.map((_, i) => pool.length - i);
+        const total = weights.reduce((a, b) => a + b, 0);
+        let roll = Math.random() * total;
+        let idx = 0;
+        while (roll > weights[idx]) { roll -= weights[idx]; idx++; }
+        bubblePicks.push(pool.splice(idx, 1)[0]);
     }
+    nationalTeams.push(...locks, ...bubblePicks);
+    // For the recap screen: who got snubbed.
+    gameState.tourneySnubs = pool.slice(0, 4).map(t => t.name);
 
     // Re-sort the final 32 teams purely by poll score to seed them 1 through 32
     nationalTeams.sort((a, b) => getPollScore(b) - getPollScore(a));
