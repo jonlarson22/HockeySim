@@ -703,15 +703,16 @@ export function processOffSeason(gameState) {
 
             if (Math.random() < boostChance) {
                 const statKeys = Object.keys(player.stats);
-                // The offseason is where real development happens: bigger jumps
-                // for high-ceiling players (+1 per 15 gap on top of the base +2-4).
-                const gapBonus = Math.floor(gap / 15);
-                statKeys.forEach(stat => {
-                    if (Math.random() < 0.50 && player.stats[stat] < 99) {
-                        player.stats[stat] += Math.floor(Math.random() * 3) + 2 + gapBonus;
-                    }
-                });
-                
+                // Close a fraction of the remaining gap: high-ceiling players
+                // make big jumps, low-ceiling players get a nudge. Self-limiting
+                // — you approach potential but never overshoot it.
+                const ovrGain = (player.potential - player.overall) * 0.25;
+                let pointsToDistribute = Math.max(1, Math.round(ovrGain * statKeys.length));
+                let guard = 0;
+                while (pointsToDistribute > 0 && guard++ < 500) {
+                    const stat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                    if (player.stats[stat] < 99) { player.stats[stat]++; pointsToDistribute--; }
+                }
                 let statTotal = 0;
                 for (let key in player.stats) {
                     statTotal += player.stats[key];
@@ -719,15 +720,19 @@ export function processOffSeason(gameState) {
                 player.overall = Math.round(statTotal / statKeys.length);
             }
 
-            // Breakout: high-ceiling players sometimes explode in one offseason
-            // (+2-3 per stat). Rare enough to feel special when it hits.
+            // Breakout: high-ceiling players sometimes explode — closing 35%
+            // of the gap in one offseason instead of 18%.
             const breakoutChance = seasonRole === 'Active Roster' ? 0.10
                 : seasonRole === 'Practice Squad' ? 0.05 : 0;
             if (gap >= 15 && Math.random() < breakoutChance) {
                 const statKeys = Object.keys(player.stats);
-                statKeys.forEach(stat => {
-                    if (player.stats[stat] < 99) player.stats[stat] += Math.floor(Math.random() * 2) + 2;
-                });
+                const ovrGain = (player.potential - player.overall) * 0.45;
+                let pointsToDistribute = Math.max(1, Math.round(ovrGain * statKeys.length));
+                let guard = 0;
+                while (pointsToDistribute > 0 && guard++ < 500) {
+                    const stat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                    if (player.stats[stat] < 99) { player.stats[stat]++; pointsToDistribute--; }
+                }
                 let statTotal = 0;
                 for (let key in player.stats) {
                     statTotal += player.stats[key];
