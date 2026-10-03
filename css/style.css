@@ -259,6 +259,20 @@ li {
         overflow-x: auto;
         white-space: nowrap;
     }
+    .roster-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .roster-row .player-link {
+        flex: 1 1 220px;
+        min-width: 0;
+    }
+    .roster-row .player-stats {
+        white-space: normal;
+    }
+    .roster-row .role-select {
+        flex-shrink: 0;
+    }
 }
 
 /* Make recap and bracket screens wider */

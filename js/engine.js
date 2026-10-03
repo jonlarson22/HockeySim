@@ -1,4 +1,4 @@
-import { getRandomFirstName, getRandomLastName } from './data.js';
+import { getRandomFirstName, getRandomLastName, conferences } from './data.js';
 import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole } from './lines.js';
 
 import { 
@@ -6,6 +6,7 @@ import {
     generateConferenceSemifinals, 
     generateConferenceFinals,
     generateNationalTournament,
+    generateNationalRound16,
     generateNationalQuarterfinals,
     generateNationalSemifinals,
     generateNationalChampionship
@@ -42,7 +43,7 @@ function focusStatPool(focus, statKeys) {
 // NEW: Initialize the league with randomized prestige and zeroed records
 export function initializeLeague(baseTeams) {
     return baseTeams.map(team => {
-        const variance = Math.floor(Math.random() * 9) - 4; 
+        const variance = Math.floor(Math.random() * 7) - 3; // +/-3 starting prestige
         let newPrestige = team.prestige + variance;
         
         if (newPrestige > 99) newPrestige = 99;
@@ -744,9 +745,10 @@ export function simulateWeek(gameState) {
     if (gameState.currentWeek === 40) generateConferenceSemifinals(gameState);
     if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
     if (gameState.currentWeek === 42) generateNationalTournament(gameState);
-    if (gameState.currentWeek === 43) generateNationalQuarterfinals(gameState);
-    if (gameState.currentWeek === 44) generateNationalSemifinals(gameState);
-    if (gameState.currentWeek === 45) generateNationalChampionship(gameState);
+    if (gameState.currentWeek === 43) generateNationalRound16(gameState);
+    if (gameState.currentWeek === 44) generateNationalQuarterfinals(gameState);
+    if (gameState.currentWeek === 45) generateNationalSemifinals(gameState);
+    if (gameState.currentWeek === 46) generateNationalChampionship(gameState);
 
     return true;
 }
@@ -971,7 +973,96 @@ export function processOffSeason(gameState) {
         });
     });
 
+    // League-wide prestige drift: AI programs rise and fall with results.
+    // Whole conferences can shift over a decade — no permanent caste system.
+    // (The user's team is handled separately by applySeasonConsequences.)
+    const danced = new Set();
+    (gameState.schedule || []).forEach(week => (week || []).forEach(g => {
+        if (g.type === 'national_tourney') { danced.add(g.homeTeamId); danced.add(g.awayTeamId); }
+    }));
+    gameState.leagueTeams.forEach(team => {
+        if (team.id === gameState.teamId) return;
+        const gp = (team.wins || 0) + (team.losses || 0) + (team.otl || 0);
+        if (!gp) return;
+        const winPct = ((team.wins || 0) * 2 + (team.otl || 0)) / (gp * 2);
+        const p = team.prestige || 50;
+        let drift = 0;
+        if (p >= 80) drift = winPct >= 0.65 ? 1 : winPct < 0.5 ? -3 : -1;
+        else if (p >= 65) drift = winPct >= 0.6 ? 2 : winPct < 0.45 ? -2 : 0;
+        else if (p >= 50) drift = winPct >= 0.55 ? 2 : winPct < 0.4 ? -1 : 1;
+        else if (p >= 35) drift = winPct >= 0.5 ? 3 : winPct < 0.35 ? -1 : 1;
+        else drift = winPct >= 0.45 ? 3 : 0;
+        if (danced.has(team.id)) drift += 2;
+        team.prestige = Math.max(1, Math.min(99, p + drift + randomInt(-1, 1)));
+    });
+
+    // Conference realignment: strong programs in weak leagues get invited up;
+    // collapsing powers get sent down. Rare (max 2 swaps/year), and a moved
+    // team must prove itself for 4 seasons before moving again. Not soccer —
+    // this is deliberate, not automatic.
+    conferenceRealignment(gameState);
+
     return true;
+}
+
+// Runs once per offseason. Returns a log of moves for the recap screen.
+export function conferenceRealignment(gameState) {
+    const log = [];
+    const confAvg = {};
+    const confTeams = {};
+    gameState.leagueTeams.forEach(t => {
+        (confTeams[t.confId] = confTeams[t.confId] || []).push(t);
+    });
+    Object.keys(confTeams).forEach(cid => {
+        const ts = confTeams[cid];
+        confAvg[cid] = ts.reduce((a, t) => a + (t.prestige || 50), 0) / ts.length;
+    });
+    // Conferences ranked strongest to weakest.
+    const ranked = Object.keys(confTeams).sort((a, b) => confAvg[b] - confAvg[a]);
+
+    let swaps = 0;
+    // Try to move teams up from the bottom half into the top half.
+    for (let i = ranked.length - 1; i >= Math.ceil(ranked.length / 2) && swaps < 2; i--) {
+        const weakId = ranked[i];
+        const weakTeams = confTeams[weakId].filter(t => (t.seasonsInConf ?? 4) >= 4);
+        if (!weakTeams.length) continue;
+        // Best team in the weak conference.
+        const up = [...weakTeams].sort((a, b) => b.prestige - a.prestige)[0];
+        // Find a stronger conference with a clear gap that would take them.
+        for (let j = 0; j < Math.floor(ranked.length / 2) && swaps < 2; j++) {
+            const strongId = ranked[j];
+            if (confAvg[strongId] - confAvg[weakId] < 15) continue;
+            // They need to be a proven power (65+) and competitive up there.
+            if (up.prestige < 65 || up.prestige < confAvg[strongId] - 10) continue;
+            const strongTeams = confTeams[strongId].filter(t => (t.seasonsInConf ?? 4) >= 4 && t.id !== gameState.teamId);
+            if (!strongTeams.length) continue;
+            // The weakest team in the strong conference goes down.
+            const down = [...strongTeams].sort((a, b) => a.prestige - b.prestige)[0];
+            if (down.prestige > confAvg[weakId] + 10) continue;
+            // User's team: invite, don't force. AI teams move automatically.
+            if (up.id === gameState.teamId) {
+                (gameState.realignmentInvites = gameState.realignmentInvites || []).push({
+                    teamId: up.id, fromConf: weakId, toConf: strongId,
+                    downTeamId: down.id, downTeamName: down.name
+                });
+                continue;
+            }
+            const fromName = conferences.find(c => c.id === weakId)?.name || weakId;
+            const toName = conferences.find(c => c.id === strongId)?.name || strongId;
+            up.confId = strongId; up.seasonsInConf = 0;
+            down.confId = weakId; down.seasonsInConf = 0;
+            log.push(`${up.name} invited to the ${toName} (${down.name} relegated to the ${fromName})`);
+            swaps++;
+            // Refresh the groupings after a swap.
+            confTeams[weakId] = confTeams[weakId].filter(t => t.id !== up.id).concat([down]);
+            confTeams[strongId] = confTeams[strongId].filter(t => t.id !== down.id).concat([up]);
+            break;
+        }
+    }
+    // Age everyone's tenure (moved teams go 0 -> 1; everyone else +1).
+    gameState.leagueTeams.forEach(t => { t.seasonsInConf = (t.seasonsInConf ?? 4) + 1; });
+    if (log.length) gameState.realignmentLog = log;
+    return log;
 }
 
 // --- LEAGUE RANKING HELPERS ---

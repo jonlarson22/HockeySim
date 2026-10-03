@@ -3,9 +3,10 @@
 // Spending here reduces freshman recruiting week 1's budget (shared pool).
 import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
-import { submitPortal } from '../actions.js';
+import { submitPortal, respondToRealignmentInvite } from '../actions.js';
 import { portalBudget } from '../portal.js';
 import { getScoutedGrade, getPotentialDescriptor } from '../recruiting.js';
+import { conferences } from '../data.js';
 import { esc } from '../ui.js';
 
 export function render(container) {
@@ -79,8 +80,29 @@ export function render(container) {
                 </div>`;
         }).join('');
 
+        // Conference realignment invite (if the user's team earned one).
+        const invite = (s.realignmentInvites || []).find(i => i.teamId === s.teamId);
+        let inviteHTML = '';
+        if (invite && !submitted) {
+            const toName = conferences.find(c => c.id === invite.toConf)?.name || invite.toConf;
+            const fromName = conferences.find(c => c.id === invite.fromConf)?.name || invite.fromConf;
+            inviteHTML = `
+                <div style="background:#1e3a5f;border:2px solid #3b82f6;padding:14px;border-radius:8px;margin-bottom:16px;">
+                    <h3 style="margin-top:0;">📨 Conference Realignment Invite</h3>
+                    <p>The <strong>${esc(toName)}</strong> has invited ${esc(team.name)} to join, replacing ${esc(invite.downTeamName)} (relegated to the ${esc(fromName)}).</p>
+                    <div style="display:flex;gap:8px;">
+                        <button id="realign-accept" style="padding:8px 20px;">Accept Invite</button>
+                        <button id="realign-decline" class="secondary" style="padding:8px 20px;">Decline</button>
+                    </div>
+                </div>`;
+        }
+        // Realignment results from around the league.
+        const realignLog = (s.realignmentLog || []).map(l => `<div>🔄 ${esc(l)}</div>`).join('');
+
         container.innerHTML = `
             <h2>Transfer Portal</h2>
+            ${inviteHTML}
+            ${realignLog ? `<div style="margin-bottom:12px;color:#aaa;">${realignLog}</div>` : ''}
             <p style="color:#aaa;">Proven college players with visible OVR. Spending here comes out of your recruiting budget — freshman week 1 will have <strong>${Math.max(0, pointsLeft)} pts</strong> left.</p>
             <p><strong>Budget:</strong> <span style="color:#4ade80;">${pointsLeft} / ${budget} pts</span> remaining</p>
             ${considering.length ? `<h3>Your players considering transfer</h3><div style="display:grid;gap:8px;margin-bottom:16px;">${retainCards}</div>` : ''}
@@ -132,6 +154,11 @@ export function render(container) {
             } else retain.delete(id);
             paint();
         });
+        const acceptBtn = container.querySelector('#realign-accept');
+        if (acceptBtn) {
+            acceptBtn.onclick = () => { respondToRealignmentInvite(true); paint(); };
+            container.querySelector('#realign-decline').onclick = () => { respondToRealignmentInvite(false); paint(); };
+        }
         container.querySelector('#portal-submit').onclick = () => {
             const res = submitPortal(alloc, [...retain]);
             submitted = true;

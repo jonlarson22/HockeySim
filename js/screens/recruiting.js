@@ -4,6 +4,7 @@ import { showScreen } from '../router.js';
 import { submitRecruitingWeek } from '../actions.js';
 import { calculateRecruitingPoints, getScoutedGrade, getPotentialDescriptor } from '../recruiting.js';
 import { freshmanWeekBudget } from '../portal.js';
+import { conferences } from '../data.js';
 import { esc } from '../ui.js';
 
 const STEP = 10;
@@ -41,7 +42,7 @@ export function render(container) {
             const isFav = p.favorites && p.favorites.includes(s.teamId);
             const favBadge = isFav ? '<span style="background:#4ade80;color:#000;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;margin-right:5px;" title="Top school: +25% point effectiveness">TOP SCHOOL</span>' : '';
             const prefTags = (p.prefTags || []).map(t => {
-                const label = t.type === 'home' ? 'Home: ' + t.confId : t.label;
+                const label = t.type === 'home' ? 'Home: ' + (conferences.find(c => c.id === t.confId)?.name || t.confId) : t.label;
                 return '<span style="background:#333;color:#aaa;padding:1px 5px;border-radius:3px;font-size:0.75em;margin-right:4px;">' + esc(label) + '</span>';
             }).join('');
             return `

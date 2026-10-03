@@ -50,4 +50,26 @@ export function render(container, params) {
     paint(initial);
     filter.onchange = e => paint(e.target.value);
     container.querySelector('#recap-continue').onclick = () => showScreen('dashboard');
+
+    // Mystery, Alaska: if the underdogs from Alaska knock off a giant,
+    // it gets a headline.
+    const alaska = s.leagueTeams.find(t => t.id === 'team_alaska');
+    let biggest = null;
+    weekGames.forEach(g => {
+        if (g.homeScore == null) return;
+        const home = s.leagueTeams.find(t => t.id === g.homeTeamId);
+        const away = s.leagueTeams.find(t => t.id === g.awayTeamId);
+        if (!home || !away) return;
+        const winner = g.homeScore > g.awayScore ? home : away;
+        const loser = winner === home ? away : home;
+        if (winner.id === 'team_alaska' && alaska && (loser.prestige - alaska.prestige) >= 20) {
+            const gap = loser.prestige - alaska.prestige;
+            if (!biggest || gap > biggest.gap) biggest = { gap, loser, ws: Math.max(g.homeScore, g.awayScore), ls: Math.min(g.homeScore, g.awayScore) };
+        }
+    });
+    if (biggest) {
+        const banner = document.createElement('div');
+        banner.innerHTML = `<div style="background:#0c2a4a;border:2px solid #1D5FA8;padding:12px;border-radius:8px;margin-bottom:15px;text-align:center;font-size:1.1em;">🏒 <strong>MYSTERY, ALASKA:</strong> Alaska stuns ${esc(biggest.loser.name)} ${biggest.ws}–${biggest.ls}!</div>`;
+        container.querySelector('.dashboard-panel').insertBefore(banner, container.querySelector('#recap-filter'));
+    }
 }

@@ -17,7 +17,7 @@ function gameCard(game, s, seedPair) {
         return `
             <div class="game-result-card">
                 <div class="matchup-line">${awaySeed}<span class="team-name">${esc(awayTeam.name)}</span><span class="team-score">${game.awayScore}</span></div>
-                <div class="matchup-line">${homeSeed}<span class="team-name">${esc(home.name)}</span><span class="team-score">${game.homeScore}${otText}</span></div>
+                <div class="matchup-line">${homeSeed}<span class="team-name">${esc(homeTeam.name)}</span><span class="team-score">${game.homeScore}${otText}</span></div>
                 <div style="text-align:right;color:#4ade80;font-size:0.85em;margin-top:4px;">→ ${esc(winner)} Advances</div>
             </div>`;
     }
@@ -41,11 +41,18 @@ export function render(container) {
 
     if (isBeyondConference) {
         const rounds = [
-            { week: 42, name: 'Round of 16', seeds: [[1,16],[2,15],[3,14],[4,13],[5,12],[6,11],[7,10],[8,9]] },
-            { week: 43, name: 'Quarterfinals', seeds: [[1,8],[2,7],[3,6],[4,5]] },
-            { week: 44, name: 'Semifinals', seeds: [[1,4],[2,3]] },
-            { week: 45, name: 'Championship', seeds: [[1,2]] }
+            { week: 42, name: 'Round of 32', seeds: [[1,32],[2,31],[3,30],[4,29],[5,28],[6,27],[7,26],[8,25],[9,24],[10,23],[11,22],[12,21],[13,20],[14,19],[15,18],[16,17]] },
+            { week: 43, name: 'Round of 16', seeds: [[1,16],[2,15],[3,14],[4,13],[5,12],[6,11],[7,10],[8,9]] },
+            { week: 44, name: 'Quarterfinals', seeds: [[1,8],[2,7],[3,6],[4,5]] },
+            { week: 45, name: 'Semifinals', seeds: [[1,4],[2,3]] },
+            { week: 46, name: 'Championship', seeds: [[1,2]] }
         ];
+        // The boys from Mystery are going dancing.
+        const natIds = new Set();
+        (s.schedule[41] || []).filter(g => g.isNational).forEach(g => { natIds.add(g.homeTeamId); natIds.add(g.awayTeamId); });
+        if (natIds.has('team_alaska')) {
+            html += `<div style="background:#0c2a4a;border:2px solid #1D5FA8;padding:12px;border-radius:8px;margin:10px 0;text-align:center;">🏒 The boys from Mystery are going dancing — <strong>Alaska</strong> is in the national tournament!</div>`;
+        }
         rounds.forEach(round => {
             const games = (s.schedule[round.week - 1] || []).filter(g => g.type === 'national_tourney' || g.isNational);
             if (games.length === 0) return;
@@ -55,6 +62,14 @@ export function render(container) {
                 // gameCard expects [homeSeed, awaySeed] for the two lines
                 html += gameCard(game, s, [pair[0], pair[1]]);
             });
+            // Fairy tale check: did Alaska win it all?
+            if (round.name === 'Championship' && games.length && games[0].homeScore != null) {
+                const g = games[0];
+                const champId = g.homeScore > g.awayScore ? g.homeTeamId : g.awayTeamId;
+                if (champId === 'team_alaska') {
+                    html += `<div style="background:#0c2a4a;border:2px solid #1D5FA8;padding:14px;border-radius:8px;margin-top:12px;text-align:center;font-size:1.15em;">🏆 <strong>MYSTERY, ALASKA COMPLETES THE FAIRY TALE:</strong> Alaska wins the national championship!</div>`;
+                }
+            }
         });
     } else {
         const rounds = [
@@ -71,7 +86,7 @@ export function render(container) {
             games.forEach(game => { html += gameCard(game, s, null); });
         });
         if (!started) {
-            html += `<p style="color:#888;margin-top:10px;">The regular season is still underway. The bracket will be revealed after Week 38.</p>`;
+            html += `<p style="color:#888;margin-top:10px;">The regular season is still underway. The bracket will be revealed after the regular season.</p>`;
         }
     }
 

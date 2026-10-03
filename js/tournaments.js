@@ -104,12 +104,12 @@ export function generateConferenceFinals(gameState) {
     gameState.schedule.push(finalGames);
 }
 
-// Determine the top 16 teams and build the bracket
+// Determine the 32-team national tournament field and build the bracket
 export function generateNationalTournament(gameState) {
     const finalGames = gameState.schedule[40]; // Index 40 is Week 41
     let nationalTeams = [];
-    
-    // 1. Auto-Bids: Get Conference Champions
+
+    // 1. Auto-Bids: Get Conference Champions (10 conferences)
     finalGames.forEach(game => {
         const winnerId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
         const winnerTeam = gameState.leagueTeams.find(t => t.id === winnerId);
@@ -124,38 +124,80 @@ export function generateNationalTournament(gameState) {
         return (overallPts * 12) + (winPct * 50) + (t.prestige * 0.5) - ((t.losses || 0) * 2);
     };
 
-    // 3. At-Large Bids: Fill the rest of the 16 slots
-    let sortedLeague = [...gameState.leagueTeams].sort((a, b) => getPollScore(b) - getPollScore(a));
-    
-    for (let i = 0; i < sortedLeague.length; i++) {
-        if (nationalTeams.length >= 16) break;
-        if (!nationalTeams.some(t => t.id === sortedLeague[i].id)) {
-            nationalTeams.push(sortedLeague[i]);
-        }
-    }
+    // 3. At-Large Bids: 16 locks, then a 6-team "bubble" picked from the next
+    // 14 by weighted randomness — like a real committee, there are snubs
+    // and surprise inclusions every year.
+    let sortedLeague = [...gameState.leagueTeams]
+        .filter(t => !nationalTeams.some(nt => nt.id === t.id))
+        .sort((a, b) => getPollScore(b) - getPollScore(a));
 
-    // Re-sort the final 16 teams purely by poll score to seed them 1 through 16
+    const locks = sortedLeague.slice(0, 16);
+    const bubblePool = sortedLeague.slice(16, 30);
+    const bubblePicks = [];
+    const pool = [...bubblePool];
+    while (bubblePicks.length < 6 && pool.length) {
+        // Weight favors higher-ranked teams but leaves room for chaos.
+        const weights = pool.map((_, i) => pool.length - i);
+        const total = weights.reduce((a, b) => a + b, 0);
+        let roll = Math.random() * total;
+        let idx = 0;
+        while (roll > weights[idx]) { roll -= weights[idx]; idx++; }
+        bubblePicks.push(pool.splice(idx, 1)[0]);
+    }
+    nationalTeams.push(...locks, ...bubblePicks);
+    // For the recap screen: who got snubbed.
+    gameState.tourneySnubs = pool.slice(0, 4).map(t => t.name);
+
+    // Re-sort the final 32 teams purely by poll score to seed them 1 through 32
     nationalTeams.sort((a, b) => getPollScore(b) - getPollScore(a));
 
-    // Seed matchups (1v16, 2v15, 3v14, 4v13, 5v12, 6v11, 7v10, 8v9)
+    // Seed matchups (1v32, 2v31, ..., 16v17)
     let natTourneyGames = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 16; i++) {
         natTourneyGames.push({
             week: 42, type: 'national_tourney', isNational: true,
-            homeTeamId: nationalTeams[i].id, 
-            awayTeamId: nationalTeams[15 - i].id,
+            homeTeamId: nationalTeams[i].id,
+            awayTeamId: nationalTeams[31 - i].id,
             homeSeed: i + 1,
-            awaySeed: 16 - i,
+            awaySeed: 32 - i,
             played: false, homeScore: null, awayScore: null, ot: false
         });
     }
-    
+
     gameState.schedule.push(natTourneyGames);
 }
 
-// Generate National Quarterfinals (Week 43) from Round of 16 results (Week 42)
+// Generate National Round of 16 (Week 43) from Round of 32 results (Week 42)
+export function generateNationalRound16(gameState) {
+    const r32Games = gameState.schedule[41]; // Index 41 is Week 42 (Round of 32)
+    let r16Games = [];
+
+    const winners = r32Games
+        .filter(g => g.homeScore !== null && g.awayScore !== null)
+        .map(g => ({
+            teamId: g.homeScore > g.awayScore ? g.homeTeamId : g.awayTeamId,
+            seed: g.homeScore > g.awayScore ? g.homeSeed : g.awaySeed
+        }))
+        .sort((a, b) => a.seed - b.seed);
+
+    if (winners.length !== 16) return;
+
+    // Pair up: 1v16, 2v15, ..., 8v9 (by seed order)
+    for (let i = 0; i < 8; i++) {
+        r16Games.push({
+            week: 43, type: 'national_tourney', isNational: true,
+            homeTeamId: winners[i].teamId, awayTeamId: winners[15 - i].teamId,
+            homeSeed: winners[i].seed, awaySeed: winners[15 - i].seed,
+            played: false, homeScore: null, awayScore: null, ot: false
+        });
+    }
+
+    gameState.schedule.push(r16Games);
+}
+
+// Generate National Quarterfinals (Week 44) from Round of 16 results (Week 43)
 export function generateNationalQuarterfinals(gameState) {
-    const round16Games = gameState.schedule[41]; // Index 41 is Week 42 (Round of 16)
+    const round16Games = gameState.schedule[42]; // Index 42 is Week 43 (Round of 16)
     let qfGames = [];
 
     // Get the 8 winners from the Round of 16, maintaining their seed
@@ -171,25 +213,25 @@ export function generateNationalQuarterfinals(gameState) {
 
     // Pair up: 1v8, 2v7, 3v6, 4v5 (from the 16 seeds)
     qfGames.push({
-        week: 43, type: 'national_tourney', isNational: true,
+        week: 44, type: 'national_tourney', isNational: true,
         homeTeamId: winners[0].teamId, awayTeamId: winners[7].teamId,
         homeSeed: winners[0].seed, awaySeed: winners[7].seed,
         played: false, homeScore: null, awayScore: null, ot: false
     });
     qfGames.push({
-        week: 43, type: 'national_tourney', isNational: true,
+        week: 44, type: 'national_tourney', isNational: true,
         homeTeamId: winners[1].teamId, awayTeamId: winners[6].teamId,
         homeSeed: winners[1].seed, awaySeed: winners[6].seed,
         played: false, homeScore: null, awayScore: null, ot: false
     });
     qfGames.push({
-        week: 43, type: 'national_tourney', isNational: true,
+        week: 44, type: 'national_tourney', isNational: true,
         homeTeamId: winners[2].teamId, awayTeamId: winners[5].teamId,
         homeSeed: winners[2].seed, awaySeed: winners[5].seed,
         played: false, homeScore: null, awayScore: null, ot: false
     });
     qfGames.push({
-        week: 43, type: 'national_tourney', isNational: true,
+        week: 44, type: 'national_tourney', isNational: true,
         homeTeamId: winners[3].teamId, awayTeamId: winners[4].teamId,
         homeSeed: winners[3].seed, awaySeed: winners[4].seed,
         played: false, homeScore: null, awayScore: null, ot: false
@@ -198,9 +240,9 @@ export function generateNationalQuarterfinals(gameState) {
     gameState.schedule.push(qfGames);
 }
 
-// Generate National Semifinals (Week 44) from Quarterfinals results (Week 43)
+// Generate National Semifinals (Week 45) from Quarterfinals results (Week 44)
 export function generateNationalSemifinals(gameState) {
-    const qfGames = gameState.schedule[42]; // Index 42 is Week 43 (Quarterfinals)
+    const qfGames = gameState.schedule[43]; // Index 43 is Week 44 (Quarterfinals)
     let sfGames = [];
 
     // Get the 4 winners from the Quarterfinals
@@ -216,13 +258,13 @@ export function generateNationalSemifinals(gameState) {
 
     // Pair up: 1 seed vs 4 seed, 2 seed vs 3 seed
     sfGames.push({
-        week: 44, type: 'national_tourney', isNational: true,
+        week: 45, type: 'national_tourney', isNational: true,
         homeTeamId: winners[0].teamId, awayTeamId: winners[3].teamId,
         homeSeed: winners[0].seed, awaySeed: winners[3].seed,
         played: false, homeScore: null, awayScore: null, ot: false
     });
     sfGames.push({
-        week: 44, type: 'national_tourney', isNational: true,
+        week: 45, type: 'national_tourney', isNational: true,
         homeTeamId: winners[1].teamId, awayTeamId: winners[2].teamId,
         homeSeed: winners[1].seed, awaySeed: winners[2].seed,
         played: false, homeScore: null, awayScore: null, ot: false
@@ -231,9 +273,9 @@ export function generateNationalSemifinals(gameState) {
     gameState.schedule.push(sfGames);
 }
 
-// Generate National Championship (Week 45) from Semifinals results (Week 44)
+// Generate National Championship (Week 46) from Semifinals results (Week 45)
 export function generateNationalChampionship(gameState) {
-    const sfGames = gameState.schedule[43]; // Index 43 is Week 44 (Semifinals)
+    const sfGames = gameState.schedule[44]; // Index 44 is Week 45 (Semifinals)
     let champGames = [];
 
     // Get the 2 winners from the Semifinals
@@ -249,7 +291,7 @@ export function generateNationalChampionship(gameState) {
 
     // Championship game
     champGames.push({
-        week: 45, type: 'national_tourney', isNational: true,
+        week: 46, type: 'national_tourney', isNational: true,
         homeTeamId: winners[0].teamId, awayTeamId: winners[1].teamId,
         homeSeed: winners[0].seed, awaySeed: winners[1].seed,
         played: false, homeScore: null, awayScore: null, ot: false

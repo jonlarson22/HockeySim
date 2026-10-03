@@ -77,6 +77,36 @@ export function submitPortal(allocations, retainIds) {
     return result;
 }
 
+// Responds to a conference realignment invite (accept moves the user's team
+// up; decline keeps them put). The displaced team still moves down.
+export function respondToRealignmentInvite(accept) {
+    update(state => {
+        const invites = state.realignmentInvites || [];
+        const inv = invites.find(i => i.teamId === state.teamId);
+        if (!inv) return;
+        const team = state.leagueTeams.find(t => t.id === state.teamId);
+        const down = state.leagueTeams.find(t => t.id === inv.downTeamId);
+        if (accept && team) {
+            team.confId = inv.toConf;
+            team.seasonsInConf = 0;
+        }
+        // The other team moves regardless.
+        if (down) {
+            // If user declined, the invite is rescinded — no one moves.
+            if (!accept) {
+                state.realignmentInvites = invites.filter(i => i !== inv);
+                return;
+            }
+            down.confId = inv.fromConf;
+            down.seasonsInConf = 0;
+            const toName = conferences.find(c => c.id === inv.toConf)?.name || inv.toConf;
+            const fromName = conferences.find(c => c.id === inv.fromConf)?.name || inv.fromConf;
+            state.realignmentLog = [`${team.name} accepted the invite to the ${toName} (${down.name} moved to the ${fromName})`];
+        }
+        state.realignmentInvites = invites.filter(i => i !== inv);
+    });
+}
+
 // AI programs refill their rosters with generated freshmen to cover graduates.
 // (Their recruiting was never simulated — without this their rosters would
 // shrink every season.)
