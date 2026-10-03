@@ -30,7 +30,7 @@ export function render(container) {
             const opp = s.leagueTeams.find(t => t.id === (isHome ? myGame.awayTeamId : myGame.homeTeamId));
             nextText = `${scheduleLabel(s.currentWeek)} ${isHome ? 'vs.' : '@'} ${opp.abbr || opp.name}`;
         } else {
-            nextText = `${scheduleLabel(s.currentWeek)} — BYE WEEK`;
+            nextText = `${scheduleLabel(s.currentWeek)} — BYE`;
         }
     }
 

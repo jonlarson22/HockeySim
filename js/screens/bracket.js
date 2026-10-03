@@ -86,7 +86,7 @@ export function render(container) {
             games.forEach(game => { html += gameCard(game, s, null); });
         });
         if (!started) {
-            html += `<p style="color:#888;margin-top:10px;">The regular season is still underway. The bracket will be revealed after Week 38.</p>`;
+            html += `<p style="color:#888;margin-top:10px;">The regular season is still underway. The bracket will be revealed after the regular season.</p>`;
         }
     }
 

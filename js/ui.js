@@ -15,10 +15,11 @@ export function scheduleLabel(weekNumber) {
     if (weekNumber === 39) return 'Conference Quarterfinals';
     if (weekNumber === 40) return 'Conference Semifinals';
     if (weekNumber === 41) return 'Conference Finals';
-    if (weekNumber === 42) return 'National Round of 16';
-    if (weekNumber === 43) return 'National Quarterfinals';
-    if (weekNumber === 44) return 'National Semifinals';
-    if (weekNumber === 45) return 'National Championship';
+    if (weekNumber === 42) return 'National Round of 32';
+    if (weekNumber === 43) return 'National Round of 16';
+    if (weekNumber === 44) return 'National Quarterfinals';
+    if (weekNumber === 45) return 'National Semifinals';
+    if (weekNumber === 46) return 'National Championship';
     return 'Offseason';
 }
 
