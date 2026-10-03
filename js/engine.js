@@ -105,7 +105,7 @@ export function generatePlayer(position, teamPrestige) {
     }
     const overall = Math.round(statTotal / statCount);
 
-    let potential = randomInt(55, 95);
+    let potential = randomInt(55, 99);
     if (overall >= potential) {
         potential = overall + randomInt(1, 6); 
         if (potential > 99) potential = 99;
@@ -832,14 +832,14 @@ export function processOffSeason(gameState) {
     const coachDev = gameState.coach.skills.development || 5;
 
     // Early NHL draft declarations: juniors/seniors only. Probability scales
-    // with OVR — a 76 is ~10%, an 85 ~55%, capped at 80% (never guaranteed,
-    // even for a 94). Hits AI contenders too, so the rich get churned.
+    // with OVR — a 76 is ~4%, an 85 ~40%, capped at 60% (never guaranteed).
+    // Hits AI contenders too, so the rich get churned.
     const declared = [];
     gameState.leagueTeams.forEach(team => {
         ['forwards', 'defensemen', 'goalies'].forEach(key => {
             team.roster[key] = team.roster[key].filter(p => {
                 if ((p.year === 'Jr' || p.year === 'Sr') && p.injuryWeeks === 0) {
-                    const prob = Math.min(0.8, Math.max(0, ((p.overall || 0) - 74) * 0.05));
+                    const prob = Math.min(0.6, Math.max(0, ((p.overall || 0) - 75) * 0.04));
                     if (Math.random() < prob) {
                         declared.push({ name: `${p.firstName} ${p.lastName}`, team: team.name, overall: p.overall, year: p.year });
                         return false;

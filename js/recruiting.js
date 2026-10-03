@@ -57,7 +57,7 @@ function generateProspect(position, targetPrestige) {
         statCount++;
     }
     const overall = Math.round(statTotal / statCount);
-    let potential = randomInt(55, 95);
+    let potential = randomInt(55, 99);
     if (overall >= potential) potential = Math.min(99, overall + randomInt(1, 6));
 
     // Recruiting-specific: stars cost more and draw real competition.
