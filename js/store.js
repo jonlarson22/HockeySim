@@ -5,11 +5,39 @@
 // The roster lives ONLY on the team object inside leagueTeams — there is no
 // separate state.roster duplicate.
 
-const SAVE_KEY = 'college_hockey_dynasty_save';
+const SAVE_KEY = 'college_hockey_dynasty_save'; // legacy single slot (migrated)
+const SLOT_KEY = (n) => `college_hockey_dynasty_save_${n}`;
+const ACTIVE_SLOT_KEY = 'college_hockey_dynasty_active_slot';
 const SAVE_VERSION = 1;
+export const SAVE_SLOTS = [1, 2, 3];
 
 let state = null;
+let activeSlot = 1;
 const listeners = new Set();
+
+// One-time migration: legacy single-slot save becomes slot 1.
+function migrateLegacySlot() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (raw && !localStorage.getItem(SLOT_KEY(1))) {
+            localStorage.setItem(SLOT_KEY(1), raw);
+        }
+        if (raw) localStorage.removeItem(SAVE_KEY);
+    } catch (e) { /* ignore */ }
+    try {
+        const a = parseInt(localStorage.getItem(ACTIVE_SLOT_KEY), 10);
+        if (a >= 1 && a <= 3) activeSlot = a;
+    } catch (e) { /* ignore */ }
+}
+migrateLegacySlot();
+
+export function getActiveSlot() { return activeSlot; }
+export function setActiveSlot(n) {
+    if (n >= 1 && n <= 3) {
+        activeSlot = n;
+        try { localStorage.setItem(ACTIVE_SLOT_KEY, String(n)); } catch (e) { /* ignore */ }
+    }
+}
 
 export function getState() {
     return state;
@@ -65,19 +93,41 @@ export function newCareerState() {
     };
 }
 
-export function hasSave() {
+export function hasSave(slot = activeSlot) {
     try {
-        return localStorage.getItem(SAVE_KEY) !== null;
+        return localStorage.getItem(SLOT_KEY(slot)) !== null;
     } catch (e) {
         return false;
     }
 }
 
-export function persist() {
+// Preview info for a slot (menu display). Null when empty/unreadable.
+export function getSlotInfo(slot) {
+    let raw = null;
+    try { raw = localStorage.getItem(SLOT_KEY(slot)); } catch (e) { return null; }
+    if (!raw) return null;
+    try {
+        const data = JSON.parse(raw);
+        const s = data && data.state ? data.state : data;
+        const coach = s.coach || {};
+        const team = (s.leagueTeams || []).find(t => t.id === s.teamId);
+        return {
+            coachName: `${coach.firstName || ''} ${coach.lastName || ''}`.trim() || 'Unnamed Coach',
+            teamName: team ? team.name : '—',
+            year: s.year || 2026,
+            week: s.currentWeek || 1,
+            savedAt: data.savedAt || null
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+export function persist(slot = activeSlot) {
     if (!state) return false;
     try {
         const payload = { version: SAVE_VERSION, savedAt: new Date().toISOString(), state };
-        localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+        localStorage.setItem(SLOT_KEY(slot), JSON.stringify(payload));
         return true;
     } catch (e) {
         console.error('store.persist: save failed:', e);
@@ -86,10 +136,10 @@ export function persist() {
 }
 
 // Best-effort load. Returns the state, or null when nothing usable is saved.
-export function loadSaved() {
+export function loadSaved(slot = activeSlot) {
     let raw = null;
     try {
-        raw = localStorage.getItem(SAVE_KEY);
+        raw = localStorage.getItem(SLOT_KEY(slot));
     } catch (e) {
         console.error('store.loadSaved: read failed:', e);
         return null;
@@ -100,6 +150,7 @@ export function loadSaved() {
         // v0 saves were the bare gameState object, not the versioned wrapper.
         const savedState = data && data.state ? data.state : data;
         state = migrate(savedState, data && data.version ? data.version : 0);
+        setActiveSlot(slot);
         emit();
         return state;
     } catch (e) {
@@ -108,10 +159,12 @@ export function loadSaved() {
     }
 }
 
-export function clearSave() {
-    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
-    state = null;
-    emit();
+export function clearSave(slot = activeSlot) {
+    try { localStorage.removeItem(SLOT_KEY(slot)); } catch (e) { /* ignore */ }
+    if (slot === activeSlot) {
+        state = null;
+        emit();
+    }
 }
 
 // Bring older saves up to the current shape.
@@ -164,22 +217,22 @@ function migrate(s, version) {
     return s;
 }
 
-export function exportSave() {
+export function exportSave(slot = activeSlot) {
     let raw = null;
-    try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { /* ignore */ }
+    try { raw = localStorage.getItem(SLOT_KEY(slot)); } catch (e) { /* ignore */ }
     if (!raw) return false;
     const blob = new Blob([raw], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `dynasty_save_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `dynasty_save_slot${slot}_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
     return true;
 }
 
-// Reads a user-picked .json file into the save slot. Resolves true on success.
-export function importSaveFile(file) {
+// Reads a user-picked .json file into a save slot. Resolves true on success.
+export function importSaveFile(file, slot = activeSlot) {
     return new Promise(resolve => {
         const reader = new FileReader();
         reader.onload = e => {
@@ -188,7 +241,7 @@ export function importSaveFile(file) {
                 const savedState = data && data.state ? data.state : data;
                 const migrated = migrate(savedState, data && data.version ? data.version : 0);
                 try {
-                    localStorage.setItem(SAVE_KEY, JSON.stringify({
+                    localStorage.setItem(SLOT_KEY(slot), JSON.stringify({
                         version: SAVE_VERSION,
                         savedAt: new Date().toISOString(),
                         state: migrated
@@ -199,6 +252,7 @@ export function importSaveFile(file) {
                     return;
                 }
                 state = migrated;
+                setActiveSlot(slot);
                 emit();
                 resolve(true);
             } catch (err) {
