@@ -2,7 +2,8 @@
 import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { enforceRosterLimits } from '../engine.js';
-import { esc, openModal } from '../ui.js';
+import { releasePlayer } from '../actions.js';
+import { esc, openModal, closeModal } from '../ui.js';
 
 const YEAR_VAL = { Fr: 1, So: 2, Jr: 3, Sr: 4 };
 
@@ -20,8 +21,22 @@ function openPlayerModal(player) {
     openModal({
         title: esc(`${player.firstName} ${player.lastName}`),
         subtitle: esc(`${player.year} | Position: ${player.position} | OVR: ${player.overall} | POT: ${player.potential}`),
-        bodyHTML: seasonHTML + statsHTML
+        bodyHTML: seasonHTML + statsHTML +
+            `<button id="player-release" style="margin-top:10px;background:#8b0000;color:#fff;border:1px solid #ff0000;">Release Player</button>` +
+            `<div id="release-confirm" style="margin-top:10px;"></div>`
     });
+    document.querySelector('#player-release').onclick = () => {
+        const c = document.querySelector('#release-confirm');
+        c.innerHTML = `<p>Release ${esc(player.firstName)} ${esc(player.lastName)}? They will leave the program immediately.</p>
+            <button id="release-yes" style="background:#8b0000;color:#fff;border:1px solid #ff0000;">Yes, release</button>
+            <button id="release-no" class="secondary" style="margin-left:8px;">Keep</button>`;
+        c.querySelector('#release-yes').onclick = () => {
+            releasePlayer(player.id);
+            closeModal();
+            showScreen('roster');
+        };
+        c.querySelector('#release-no').onclick = () => { c.innerHTML = ''; };
+    };
 }
 
 export function render(container) {

@@ -143,6 +143,18 @@ export function submitRecruitWindow() {
     return { touched };
 }
 
+// Releases a player from the program (transfer portal). No take-backs.
+export function releasePlayer(playerId) {
+    update(state => {
+        const team = state.leagueTeams.find(t => t.id === state.teamId);
+        if (!team) return;
+        for (const key of ['forwards', 'defensemen', 'goalies']) {
+            const idx = team.roster[key].findIndex(p => p.id === playerId);
+            if (idx >= 0) { team.roster[key].splice(idx, 1); return; }
+        }
+    });
+}
+
 // Stars/unstars a prospect on the in-season target board (max 5).
 // Returns 'added', 'removed', 'full', or 'invalid'.
 export function toggleRecruitTarget(prospectId) {

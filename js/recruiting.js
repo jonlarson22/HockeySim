@@ -96,10 +96,10 @@ export function generateProspectPool() {
 }
 
 export function calculateRecruitingPoints(team, coach) {
-    let points = 200;
-    points += ((coach.skills?.recruiting || 3) * 15);
-    points += (team.prestige * 3);
-    points += ((team.wins || 0) * 10);
+    let points = 60;
+    points += ((coach.skills?.recruiting || 3) * 8);
+    points += ((team.prestige || 50) * 1.5);
+    points += ((team.wins || 0) * 3);
     return Math.floor(points);
 }
 
@@ -153,9 +153,9 @@ export const POOL_TURNOVER_FRACTION = 0.15;
 
 // One window's point budget: deliberately smaller than an offseason week.
 export function calculateWindowPoints(team, coach) {
-    let points = 50;
-    points += ((coach.skills?.recruiting || 3) * 2);
-    points += ((team.prestige || 50) * 0.5);
+    let points = 35;
+    points += ((coach.skills?.recruiting || 3) * 1.5);
+    points += ((team.prestige || 50) * 0.35);
     return Math.floor(points);
 }
 
