@@ -92,11 +92,15 @@ export const lastNames = [
   // Finnish
   "Korhonen", "Virtanen", "Makinen", "Nieminen", "Laine", "Rantanen", "Aho", "Barkov", "Heiskanen", "Rinne",
   // Russian
-  "Ivanov", "Petrov", "Kuznetsov", "Popov", "Sokolov", "Mikhailov", "Fedorov", "Tarasov", "Orlov", "Volkov",
+  "Ivanov", "Petrov", "Kuznetsov", "Popov", "Sokolov", "Mikhailov", "Tarasov", "Orlov", "Volkov", "Semenov",
   // Czech / Slovak
   "Novak", "Svoboda", "Dvorak", "Prochazka", "Krejci", "Hertl", "Pastrnak", "Chara", "Hossa", "Gaborik",
   // Swiss / German
   "Weber", "Muller", "Schmid", "Keller", "Fiala", "Hischier", "Draisaitl", "Stutzle",
+  // Famous hockey bloodlines (is he related?)
+  "Gretzky", "Howe", "Ovechkin", "Crosby", "Modano", "Chelios", "Zubov", "Lemieux",
+  "Orr", "Messier", "Yzerman", "Sakic", "Forsberg", "Lidstrom", "Brodeur", "Hasek",
+  "Jagr", "Fedorov", "Bure", "Hull",
 ];
 
 // 4. Helper Function: Generate a Random Player Name
