@@ -527,8 +527,8 @@ export function simulateWeek(gameState) {
         const awayDefenseScore = (awayRatings.defense * 0.5) + (awayRatings.goalie * 0.5) + awayRatings.coachDefBoost;
 
         const SCALING_FACTOR = 8;
-        let homeExpectedGoals = 2 + ((homeOffenseScore - awayDefenseScore) / SCALING_FACTOR);
-        let awayExpectedGoals = 2 + ((awayOffenseScore - homeDefenseScore) / SCALING_FACTOR);
+        let homeExpectedGoals = 2.5 + ((homeOffenseScore - awayDefenseScore) / SCALING_FACTOR);
+        let awayExpectedGoals = 2.5 + ((awayOffenseScore - homeDefenseScore) / SCALING_FACTOR);
 
         let homeGoals = Math.max(0, Math.round(homeExpectedGoals + (Math.random() * 3 - 1.5)));
         let awayGoals = Math.max(0, Math.round(awayExpectedGoals + (Math.random() * 3 - 1.5)));
