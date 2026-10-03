@@ -73,6 +73,8 @@ function generateProspect(position, targetPrestige) {
         eligibilityYears: 4,
         redshirtUsed: false,
         injuryWeeks: 0,
+        seasonGoals: 0,
+        seasonAssists: 0,
         // Recruiting-specific
         userPoints: 0,                              // points the user has spent
         rivalInterest: 0,                           // phantom competing interest

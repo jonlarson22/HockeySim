@@ -169,6 +169,15 @@ function finalizeOffseason(state) {
             else if (p.position === 'D') team.roster.defensemen.push(p);
             else team.roster.forwards.push(p);
         });
+        // Walk-on safety net: a whiffed recruiting class can't leave the
+        // program unable to ice a team. These are warm bodies, not prospects.
+        [['G', 'goalies', 2], ['D', 'defensemen', 6], ['F', 'forwards', 12]].forEach(([pos, key, min]) => {
+            while (team.roster[key].length < min) {
+                const w = generatePlayer(pos, 20);
+                w.year = 'Fr';
+                team.roster[key].push(w);
+            }
+        });
         enforceRosterLimits(team.roster);
     }
     // Zero every record for the new season.

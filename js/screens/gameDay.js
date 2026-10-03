@@ -55,10 +55,15 @@ export function render(container, params) {
         }
 
         if (step === 'final') {
+            const tot = a => a.reduce((x, y) => x + y, 0);
+            const finalShots = game.shots ? `
+                <p style="color:#888;margin:10px 0 0;">Shots: ${esc(away.abbr)} ${tot(game.shots.shots.away)} – ${tot(game.shots.shots.home)} ${esc(home.abbr)}
+                <span style="margin:0 8px;">·</span>Saves: ${tot(game.shots.saves.away)} – ${tot(game.shots.saves.home)}</p>` : '';
             container.innerHTML = `
                 <div class="dashboard-panel text-center" style="max-width: 640px; margin: 0 auto;">
                     <p style="color:#888;margin:0;">FINAL${game.ot ? ' (OT)' : ''}</p>
                     <h2 style="margin: 15px 0; font-size: 2em;">${scoreLine(game.awayScore, game.homeScore)}</h2>
+                    ${finalShots}
                     <button id="gd-continue" class="primary" style="width:auto;">Continue</button>
                 </div>`;
             container.querySelector('#gd-continue').onclick = () =>
@@ -85,6 +90,11 @@ export function render(container, params) {
 
         const nextStep = steps[stepIdx + 1];
         const nextLabel = nextStep === 'final' ? 'Final' : PERIOD_LABEL[nextStep];
+        const perShots = game.shots ? `
+            <div style="color:#888;font-size:0.9em;margin:-8px 0 12px;">
+                Shots: ${esc(away.abbr)} ${game.shots.shots.away[step - 1]} – ${game.shots.shots.home[step - 1]} ${esc(home.abbr)}
+                <span style="margin:0 8px;">·</span>Saves: ${game.shots.saves.away[step - 1]} – ${game.shots.saves.home[step - 1]}
+            </div>` : '';
 
         container.innerHTML = `
             <div class="dashboard-panel" style="max-width: 760px; margin: 0 auto;">
@@ -92,6 +102,7 @@ export function render(container, params) {
                     <h2 style="margin:0;">${PERIOD_LABEL[step]}</h2>
                     <span style="color:var(--accent);font-weight:bold;">${endScore}</span>
                 </div>
+                ${perShots}
                 ${rows}
                 <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:15px;">
                     <button id="gd-skip" class="secondary" style="width:auto;">Sim to End</button>

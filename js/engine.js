@@ -121,7 +121,9 @@ export function generatePlayer(position, teamPrestige) {
         status: 'Active Roster',
         eligibilityYears: 4,
         redshirtUsed: false,
-        injuryWeeks: 0
+        injuryWeeks: 0,
+        seasonGoals: 0,
+        seasonAssists: 0
     };
 }
 
@@ -383,25 +385,44 @@ function weightedForward(forwards, excludeIds = []) {
 // the game. Regulation goals go to periods 1-3; the OT winner gets period 4.
 export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT) {
     const periodWeights = [0.32, 0.34, 0.34];
-    const homeFwds = getActivePlayers(homeTeam.roster.forwards);
-    const awayFwds = getActivePlayers(awayTeam.roster.forwards);
+    // Forwards drive the offense; defensemen chip in at a reduced weight.
+    // Final scores are drawn before this runs — this only assigns credit.
+    const skaterPool = (team) => [
+        ...getActivePlayers(team.roster.forwards).map(p => ({ p, w: p.overall * p.overall })),
+        ...getActivePlayers(team.roster.defensemen).map(p => ({ p, w: p.overall * p.overall * 0.25 }))
+    ];
+    const homeSkaters = skaterPool(homeTeam);
+    const awaySkaters = skaterPool(awayTeam);
     const events = [];
 
-    const makeGoal = (team, fwds, period) => {
-        const scorer = weightedForward(fwds) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
-        const a1 = Math.random() < 0.85 ? weightedForward(fwds, [scorer.id]) : null;
-        const a2 = a1 && Math.random() < 0.6 ? weightedForward(fwds, [scorer.id, a1.id]) : null;
+    const weightedScorer = (skaters, excludeIds = []) => {
+        const pool = skaters.filter(s => !excludeIds.includes(s.p.id));
+        if (!pool.length) return null;
+        let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
+        for (const s of pool) {
+            r -= s.w;
+            if (r <= 0) return s.p;
+        }
+        return pool[pool.length - 1].p;
+    };
+
+    const makeGoal = (team, skaters, period) => {
+        const scorer = weightedScorer(skaters) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
+        const a1 = Math.random() < 0.85 ? weightedScorer(skaters, [scorer.id]) : null;
+        const a2 = a1 && Math.random() < 0.6 ? weightedScorer(skaters, [scorer.id, a1.id]) : null;
         events.push({
             period,
             minute: Math.floor(Math.random() * 20) + 1,
             second: Math.floor(Math.random() * 60),
             teamId: team.id,
             scorer: `${scorer.firstName} ${scorer.lastName}`,
-            assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`)
+            scorerId: scorer.id,
+            assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`),
+            assistIds: [a1, a2].filter(Boolean).map(a => a.id)
         });
     };
 
-    const dealGoals = (team, fwds, count) => {
+    const dealGoals = (team, skaters, count) => {
         for (let i = 0; i < count; i++) {
             const roll = Math.random();
             let period = 3, acc = 0;
@@ -409,19 +430,19 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
                 acc += periodWeights[p];
                 if (roll <= acc) { period = p + 1; break; }
             }
-            makeGoal(team, fwds, period);
+            makeGoal(team, skaters, period);
         }
     };
 
     // The OT goal was already counted in the final score; re-deal it as period 4.
     const homeOT = wentOT && homeGoals > awayGoals ? 1 : 0;
     const awayOT = wentOT && awayGoals > homeGoals ? 1 : 0;
-    dealGoals(homeTeam, homeFwds, homeGoals - homeOT);
-    dealGoals(awayTeam, awayFwds, awayGoals - awayOT);
+    dealGoals(homeTeam, homeSkaters, homeGoals - homeOT);
+    dealGoals(awayTeam, awaySkaters, awayGoals - awayOT);
 
     if (wentOT) {
         const winner = homeGoals > awayGoals ? homeTeam : awayTeam;
-        makeGoal(winner, winner === homeTeam ? homeFwds : awayFwds, 4);
+        makeGoal(winner, winner === homeTeam ? homeSkaters : awaySkaters, 4);
     }
 
     // Chronological order, then attach the running score to each event.
@@ -434,6 +455,49 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
     });
 
     return events;
+}
+
+// Adds G/A from a game's events to the roster players' season totals.
+// Runs for every league game (only the user's game keeps the event objects).
+export function accumulateGameStats(homeTeam, awayTeam, events) {
+    const find = (team, id) => {
+        for (const key of ['forwards', 'defensemen', 'goalies']) {
+            const p = team.roster[key].find(x => x.id === id);
+            if (p) return p;
+        }
+        return null;
+    };
+    for (const e of events) {
+        if (!e.scorerId || e.scorerId === 'none') continue;
+        const team = e.teamId === homeTeam.id ? homeTeam : awayTeam;
+        const scorer = find(team, e.scorerId);
+        if (scorer) scorer.seasonGoals = (scorer.seasonGoals || 0) + 1;
+        for (const aid of e.assistIds || []) {
+            const a = find(team, aid);
+            if (a) a.seasonAssists = (a.seasonAssists || 0) + 1;
+        }
+    }
+}
+
+// Derives per-period shots and saves from a game's goal events.
+// Pure annotation: the final score was drawn before this runs.
+// saves.home[p] = home goalie's saves in period p (1-based index p-1).
+export function buildGameShots(homeTeam, awayTeam, events) {
+    const shots = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
+    const goals = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
+    for (const e of events) {
+        const side = e.teamId === homeTeam.id ? 'home' : 'away';
+        if (e.period >= 1 && e.period <= 4) goals[side][e.period - 1]++;
+    }
+    for (const side of ['home', 'away']) {
+        for (let p = 0; p < 4; p++) shots[side][p] = goals[side][p] * 7 + randomInt(3, 8);
+    }
+    const saves = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
+    for (let p = 0; p < 4; p++) {
+        saves.home[p] = Math.max(0, shots.away[p] - goals.away[p]);
+        saves.away[p] = Math.max(0, shots.home[p] - goals.home[p]);
+    }
+    return { shots, saves };
 }
 
 // --- SIMULATION ENGINE ---
@@ -481,9 +545,13 @@ export function simulateWeek(gameState) {
         game.ot = isOT;
         game.played = true;
 
-        // Period-by-period event log for the user's game (drives the game-day screen).
+        // Goal events feed season stats league-wide; the event objects are
+        // kept only for the user's game (drives the game-day screen).
+        const events = buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, isOT);
+        accumulateGameStats(homeTeam, awayTeam, events);
         if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
-            game.events = buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, isOT);
+            game.events = events;
+            game.shots = buildGameShots(homeTeam, awayTeam, events);
         }
 
         if (homeGoals > awayGoals) {
@@ -584,6 +652,8 @@ export function processOffSeason(gameState) {
         const allReturning = [...team.roster.forwards, ...team.roster.defensemen, ...team.roster.goalies];
 
         allReturning.forEach(player => {
+            player.seasonGoals = 0;
+            player.seasonAssists = 0;
             let boostChance = 0;
             if (player.status === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
             else if (player.status === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
