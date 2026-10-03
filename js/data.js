@@ -103,11 +103,16 @@ export const lastNames = [
   "Jagr", "Fedorov", "Bure", "Hull",
 ];
 
+export const regularLastNames = lastNames.slice(0, 100);
+export const famousLastNames = lastNames.slice(100);
+
 // 4. Helper Function: Generate a Random Player Name
 export function getRandomFirstName() {
     return firstNames[Math.floor(Math.random() * firstNames.length)];
 }
 
 export function getRandomLastName() {
-    return lastNames[Math.floor(Math.random() * lastNames.length)];
+    // Famous bloodlines are rare: 4% of players (~1 per team).
+    if (Math.random() < 0.04) return famousLastNames[Math.floor(Math.random() * famousLastNames.length)];
+    return regularLastNames[Math.floor(Math.random() * regularLastNames.length)];
 }
