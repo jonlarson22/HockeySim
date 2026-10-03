@@ -1,6 +1,6 @@
 // sw.js — offline support for College Hockey Dynasty.
 // Cache-first: the whole game is static files, so once visited it works offline.
-const CACHE = 'hockeysim-v1';
+const CACHE = 'hockeysim-v2';
 const SHELL = [
     './',
     './index.html',
