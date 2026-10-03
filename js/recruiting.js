@@ -57,8 +57,8 @@ function generateProspect(position, targetPrestige) {
         statCount++;
     }
     const overall = Math.round(statTotal / statCount);
-    let potential = randomInt(55, 99);
-    if (overall >= potential) potential = Math.min(99, overall + randomInt(1, 6));
+    // Potential is always higher than starting OVR (except at the 99 cap).
+    let potential = Math.min(99, Math.max(randomInt(55, 99), overall + 1));
 
     // Recruiting-specific: stars cost more and draw real competition.
     // Heat = what the market thinks: mostly current ability, with a nod to

@@ -105,11 +105,9 @@ export function generatePlayer(position, teamPrestige) {
     }
     const overall = Math.round(statTotal / statCount);
 
-    let potential = randomInt(55, 99);
-    if (overall >= potential) {
-        potential = overall + randomInt(1, 6); 
-        if (potential > 99) potential = 99;
-    }
+    // Potential is always higher than starting OVR (except at the 99 cap,
+    // where there's nothing left to grow into).
+    let potential = Math.min(99, Math.max(randomInt(55, 99), overall + 1));
 
     return {
         id: 'p_' + Math.random().toString(36).substring(2, 9),
