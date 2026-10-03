@@ -1052,7 +1052,7 @@ export function conferenceRealignment(gameState) {
         for (let j = 0; j < i && swaps < 2; j++) {
             const strongId = ranked[j];
             const gap = confAvg[strongId] - confAvg[weakId];
-            if (gap < 6 || gap > 15) continue;
+            if (gap < 5 || gap > 15) continue;
             // They need to dominate their league (15+ above its average) and be
             // competitive up there (within 10 of the new average).
             if (up.prestige < confAvg[weakId] + 15 || up.prestige < confAvg[strongId] - 10) continue;
