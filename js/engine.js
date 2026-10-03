@@ -6,6 +6,7 @@ import {
     generateConferenceSemifinals, 
     generateConferenceFinals,
     generateNationalTournament,
+    generateNationalRound16,
     generateNationalQuarterfinals,
     generateNationalSemifinals,
     generateNationalChampionship
@@ -744,9 +745,10 @@ export function simulateWeek(gameState) {
     if (gameState.currentWeek === 40) generateConferenceSemifinals(gameState);
     if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
     if (gameState.currentWeek === 42) generateNationalTournament(gameState);
-    if (gameState.currentWeek === 43) generateNationalQuarterfinals(gameState);
-    if (gameState.currentWeek === 44) generateNationalSemifinals(gameState);
-    if (gameState.currentWeek === 45) generateNationalChampionship(gameState);
+    if (gameState.currentWeek === 43) generateNationalRound16(gameState);
+    if (gameState.currentWeek === 44) generateNationalQuarterfinals(gameState);
+    if (gameState.currentWeek === 45) generateNationalSemifinals(gameState);
+    if (gameState.currentWeek === 46) generateNationalChampionship(gameState);
 
     return true;
 }
@@ -969,6 +971,29 @@ export function processOffSeason(gameState) {
             
             player.injuryWeeks = 0;
         });
+    });
+
+    // League-wide prestige drift: AI programs rise and fall with results.
+    // Whole conferences can shift over a decade — no permanent caste system.
+    // (The user's team is handled separately by applySeasonConsequences.)
+    const danced = new Set();
+    (gameState.schedule || []).forEach(week => (week || []).forEach(g => {
+        if (g.type === 'national_tourney') { danced.add(g.homeTeamId); danced.add(g.awayTeamId); }
+    }));
+    gameState.leagueTeams.forEach(team => {
+        if (team.id === gameState.teamId) return;
+        const gp = (team.wins || 0) + (team.losses || 0) + (team.otl || 0);
+        if (!gp) return;
+        const winPct = ((team.wins || 0) * 2 + (team.otl || 0)) / (gp * 2);
+        const p = team.prestige || 50;
+        let drift = 0;
+        if (p >= 80) drift = winPct >= 0.65 ? 1 : winPct < 0.5 ? -3 : -1;
+        else if (p >= 65) drift = winPct >= 0.6 ? 2 : winPct < 0.45 ? -2 : 0;
+        else if (p >= 50) drift = winPct >= 0.55 ? 2 : winPct < 0.4 ? -1 : 1;
+        else if (p >= 35) drift = winPct >= 0.5 ? 3 : winPct < 0.35 ? -1 : 1;
+        else drift = winPct >= 0.45 ? 3 : 0;
+        if (danced.has(team.id)) drift += 2;
+        team.prestige = Math.max(1, Math.min(99, p + drift + randomInt(-1, 1)));
     });
 
     return true;
