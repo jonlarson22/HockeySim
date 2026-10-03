@@ -62,9 +62,9 @@ function generateProspect(position, targetPrestige) {
 
     // Recruiting-specific: stars cost more and draw real competition.
     // Heat = what the market thinks: mostly current ability, with a nod to
-    // upside. A raw 60/95 (heat 70.5) draws nearly as much attention as a
-    // polished 74/76 (heat 74.6) — and way more than a 60/60 (heat 60).
-    const heat = overall + (potential - overall) * 0.3;
+    // upside. A raw 56/95 (heat 63.8) draws real attention but stays a clear
+    // tier below a polished 71/72 (heat 71.2).
+    const heat = overall + (potential - overall) * 0.2;
     return {
         id: 'rec_' + Math.random().toString(36).substring(2, 9),
         firstName: getRandomFirstName(),
