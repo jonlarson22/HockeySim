@@ -133,6 +133,33 @@ function migrate(s, version) {
     if (typeof s.year !== 'number') s.year = 2026;
     if (!Array.isArray(s.prospectPool)) s.prospectPool = [];
     if (!Array.isArray(s.recruitTargets)) s.recruitTargets = [];
+    // Forwards get a natural line position and home line slot (auto-formed
+    // for existing rosters that predate the lines system).
+    s.leagueTeams.forEach(team => {
+        if (!team.roster || !Array.isArray(team.roster.forwards)) return;
+        let needsForm = false;
+        team.roster.forwards.forEach(p => {
+            if (!p.linePos) p.linePos = ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)];
+            if (!p.lineSlot) needsForm = true;
+        });
+        if (needsForm) {
+            // Only auto-form the active dozen; reserves keep no slot.
+            const active = team.roster.forwards
+                .filter(p => p.status === 'Active Roster' && !p.injuryWeeks)
+                .sort((a, b) => (b.overall || 0) - (a.overall || 0));
+            // Reuse the lines module via dynamic import guard (store can't
+            // statically import engine's line helpers without a cycle).
+            const slots = [];
+            for (let l = 1; l <= 4; l++) for (const pos of ['C', 'LW', 'RW']) slots.push(`L${l}${pos}`);
+            const byPos = { C: [], LW: [], RW: [] };
+            active.forEach(p => byPos[p.linePos].push(p));
+            slots.forEach(slot => {
+                const pos = slot.slice(2);
+                const p = byPos[pos].shift();
+                if (p) p.lineSlot = slot;
+            });
+        }
+    });
     if (!s.recruitWeekAlloc || typeof s.recruitWeekAlloc !== 'object') s.recruitWeekAlloc = {};
     return s;
 }

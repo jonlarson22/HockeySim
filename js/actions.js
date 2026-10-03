@@ -6,6 +6,7 @@ import { showScreen } from './router.js';
 import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
 import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
 import { generateProspectPool, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
+import { fillVacantSlots } from './lines.js';
 import { conferences } from './data.js';
 
 // Simulates the current week for the whole league.
@@ -191,6 +192,9 @@ function finalizeOffseason(state) {
             }
         });
         enforceRosterLimits(team.roster);
+        // New signees slot into vacant line spots (best OVR, natural position
+        // preferred); existing assignments are never reshuffled.
+        fillVacantSlots(team.roster.forwards);
     }
     // Zero every record for the new season.
     state.leagueTeams.forEach(t => {

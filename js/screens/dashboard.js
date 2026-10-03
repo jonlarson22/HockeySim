@@ -3,6 +3,7 @@ import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
 import { pollScore, TRAINING_FOCUSES } from '../engine.js';
+import { getLines, lineChemistry } from '../lines.js';
 import { dripPerWeek, MAX_RECRUIT_TARGETS } from '../recruiting.js';
 import { conferences } from '../data.js';
 import { esc, scheduleLabel } from '../ui.js';
@@ -49,7 +50,6 @@ export function render(container) {
                     <p style="margin-bottom: 15px; color: #aaa;">${esc(nextText)}</p>
                     <button id="dash-sim" class="primary" style="width: 100%; margin-bottom: 10px;">Simulate Week</button>
                     <button id="dash-schedule" class="secondary" style="width: 100%;">Team Schedule</button>
-                    <button id="dash-debug" class="secondary" style="background: #881111; color: white;">[Debug] Sim to Offseason</button>
                 </div>
                 <div class="dashboard-panel">
                     <h2>Team Management</h2>
@@ -64,6 +64,20 @@ export function render(container) {
                     <div style="margin-top: 10px; font-size: 0.9em; color: #aaa;">
                         🎯 Recruiting Board: <strong style="color:#fff;">${(s.recruitTargets || []).length}/${MAX_RECRUIT_TARGETS}</strong>
                         <span style="color:#666;">(+${dripPerWeek(s.coach)}/wk each)</span>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.9em; color: #aaa;">
+                        ${(() => {
+                            const team = getUserTeam();
+                            const lines = getLines(team.roster.forwards.filter(p => p.status === 'Active Roster'));
+                            let tot = 0, n = 0;
+                            for (let l = 1; l <= 4; l++) {
+                                const { C, LW, RW } = lines[l];
+                                if (C && LW && RW) { tot += lineChemistry(C, LW, RW); n++; }
+                            }
+                            const avg = n ? tot / n : 0;
+                            const col = avg > 0 ? '#4ade80' : avg < 0 ? '#f87171' : '#888';
+                            return `⚗️ Line Chemistry: <strong style="color:${col};">${avg > 0 ? '+' : ''}${(avg * 100).toFixed(1)}%</strong> <span style="color:#666;">(Roster → Lines)</span>`;
+                        })()}
                     </div>
                 </div>
                 <div class="dashboard-panel">
@@ -120,12 +134,6 @@ export function render(container) {
     container.querySelector('#dash-sim').onclick = () => {
         const { weekIndex, seasonActive } = simCurrentWeek();
         goAfterSimWeek(weekIndex, seasonActive);
-    };
-
-    container.querySelector('#dash-debug').onclick = () => {
-        let guard = 0;
-        while (getState().currentWeek <= 45 && guard++ < 60) simCurrentWeek();
-        showScreen(getState().currentWeek > 45 ? 'season-recap' : 'dashboard');
     };
 
     container.querySelector('#dash-schedule').onclick = () => showScreen('schedule');

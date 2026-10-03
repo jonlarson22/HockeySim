@@ -3,6 +3,7 @@ import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { enforceRosterLimits } from '../engine.js';
 import { releasePlayer } from '../actions.js';
+import { getLines, lineChemistry, lineEffectiveOvr, getRole } from '../lines.js';
 import { esc, openModal, closeModal } from '../ui.js';
 
 const YEAR_VAL = { Fr: 1, So: 2, Jr: 3, Sr: 4 };
@@ -40,10 +41,12 @@ function openPlayerModal(player) {
 }
 
 export function render(container) {
-    const paint = (sortBy = 'overall') => {
+    const paint = (sortBy = 'overall', view = 'roster') => {
         const s = getState();
         const team = getUserTeam();
         const { goalies, defensemen, forwards } = team.roster;
+
+        if (view === 'lines') { paintLines(container, team, () => paint(sortBy, 'roster')); return; }
 
         const sorted = arr => [...arr].sort((a, b) => {
             if (sortBy === 'potential') return b.potential - a.potential;
@@ -59,13 +62,14 @@ export function render(container) {
             const noRedshirt = (pastWeek10 || p.redshirtUsed) ? 'disabled' : '';
             const injuryTag = p.injuryWeeks > 0
                 ? `<span style="background:#8b0000;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:5px;border:1px solid #ff0000;">INJ (${p.injuryWeeks}W)</span>` : '';
+            const posTag = p.linePos ? `<span style="color:#93c5fd;font-size:0.85em;margin-left:8px;">${p.linePos} · ${getRole(p)}</span>` : '';
             return `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;">
                     <a href="#" class="player-link" data-id="${p.id}" style="color:var(--accent);text-decoration:none;display:flex;align-items:center;">
                         <span style="background:#444;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:5px;border:1px solid #555;">OVR: ${p.overall}</span>
                         <span style="background:#1e3a8a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:10px;border:1px solid #3b82f6;">POT: ${p.potential}</span>
                         ${injuryTag}
-                        ${esc(p.firstName)} ${esc(p.lastName)} <span style="color:#aaa;font-size:0.9em;margin-left:5px;">(${p.year})</span>
+                        ${esc(p.firstName)} ${esc(p.lastName)} <span style="color:#aaa;font-size:0.9em;margin-left:5px;">(${p.year})</span>${posTag}
                         <span style="color:#4ade80;font-size:0.85em;margin-left:8px;white-space:nowrap;" title="Season goals / assists / points">${p.seasonGoals || 0}G ${p.seasonAssists || 0}A ${(p.seasonGoals || 0) + (p.seasonAssists || 0)}P</span>
                     </a>
                     <select class="role-select" data-id="${p.id}" ${lockAttr} style="${(pastWeek10 && isRedshirt) ? 'background:#444;cursor:not-allowed;' : ''}">
@@ -80,7 +84,10 @@ export function render(container) {
             <div class="dashboard-panel">
                 <h2>Team Roster</h2>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-                    <button id="roster-back" class="secondary" style="margin:0;">Back to Dashboard</button>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button id="roster-back" class="secondary" style="margin:0;">Back to Dashboard</button>
+                        <button id="view-lines" class="secondary" style="margin:0;">Lines</button>
+                    </div>
                     <div>
                         <label for="roster-sort">Sort By: </label>
                         <select id="roster-sort" class="input-field" style="width:auto;display:inline-block;padding:5px;">
@@ -101,7 +108,8 @@ export function render(container) {
         container.innerHTML = html;
 
         container.querySelector('#roster-back').onclick = () => showScreen('dashboard');
-        container.querySelector('#roster-sort').onchange = e => paint(e.target.value);
+        container.querySelector('#view-lines').onclick = () => paint(sortBy, 'lines');
+        container.querySelector('#roster-sort').onchange = e => paint(e.target.value, view);
 
         container.querySelectorAll('.player-link').forEach(link => {
             link.addEventListener('click', e => {
@@ -123,10 +131,93 @@ export function render(container) {
                         enforceRosterLimits(t.roster);
                     }
                 });
-                paint(container.querySelector('#roster-sort').value);
+                paint(container.querySelector('#roster-sort').value, view);
             });
         });
     };
 
-    paint('overall');
+    paint('overall', 'roster');
+}
+
+// Lines view: 4 forward lines with chemistry and effective OVR, click-to-swap.
+function paintLines(container, team, backToRoster) {
+    const forwards = team.roster.forwards;
+    const lines = getLines(forwards);
+    let selectedId = null;
+
+    const renderLines = () => {
+        const linesHtml = [1, 2, 3, 4].map(l => {
+            const line = lines[l] || {};
+            const C = line.C, LW = line.LW, RW = line.RW;
+            const chem = lineChemistry(C, LW, RW);
+            const eff = lineEffectiveOvr(C, LW, RW);
+            const chemColor = chem > 0 ? '#4ade80' : chem < 0 ? '#f87171' : '#888';
+            const chemSign = chem > 0 ? '+' : '';
+            const chemTxt = chemSign + (chem * 100).toFixed(0) + '%';
+            const card = (p, slot) => {
+                if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;">- ' + slot + ' (vacant) -</div>';
+                const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
+                const inj = p.injuryWeeks > 0 ? ' <span style="color:#f87171;">(INJ)</span>' : '';
+                const oop = p.linePos !== slot ? ' <span style="color:#fbbf24;" title="Out of position">!</span>' : '';
+                return '<div data-pid="' + p.id + '" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;' + sel + '">' +
+                    '<div style="font-size:0.75em;color:#888;">' + slot + '</div>' +
+                    '<div><strong>' + esc(p.firstName) + ' ' + esc(p.lastName) + '</strong>' + inj + oop + '</div>' +
+                    '<div style="font-size:0.8em;color:#aaa;">' + (p.linePos || '?') + ' - ' + getRole(p) + ' - OVR ' + p.overall + '</div>' +
+                    '</div>';
+            };
+            return '<div style="margin-bottom:12px;background:#1e1e1e;border-radius:6px;padding:10px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                '<strong>Line ' + l + '</strong>' +
+                '<span style="font-size:0.9em;">Eff OVR <strong>' + eff.toFixed(1) + '</strong> <span style="color:' + chemColor + ';">(' + chemTxt + ' chem)</span></span>' +
+                '</div>' +
+                '<div style="display:flex;gap:8px;">' + card(C, 'C') + card(LW, 'LW') + card(RW, 'RW') + '</div>' +
+                '</div>';
+        }).join('');
+
+        const reserves = forwards.filter(p => !p.lineSlot && p.status === 'Active Roster');
+        let resHtml = '';
+        if (reserves.length) {
+            resHtml = '<h3 style="margin-top:15px;">Reserves (click to swap into a line)</h3>';
+            reserves.forEach(p => {
+                const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
+                resHtml += '<div data-pid="' + p.id + '" class="line-player" style="padding:8px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;cursor:pointer;' + sel + '">' +
+                    '<strong>' + esc(p.firstName) + ' ' + esc(p.lastName) + '</strong>' +
+                    '<span style="font-size:0.85em;color:#aaa;margin-left:8px;">' + (p.linePos || '?') + ' - ' + getRole(p) + ' - OVR ' + p.overall + '</span>' +
+                    '</div>';
+            });
+        }
+
+        container.innerHTML =
+            '<div class="dashboard-panel">' +
+            '<h2>Forward Lines</h2>' +
+            '<p style="color:#888;font-size:0.9em;">Click two players to swap them. Chemistry adjusts each line\'s effective OVR (+/-5%).</p>' +
+            '<div style="margin-bottom:15px;"><button id="lines-back" class="secondary">Back to Roster</button></div>' +
+            linesHtml + resHtml +
+            '</div>';
+
+        container.querySelector('#lines-back').onclick = backToRoster;
+        container.querySelectorAll('.line-player').forEach(el => {
+            el.onclick = () => {
+                const pid = el.dataset.pid;
+                if (!selectedId) { selectedId = pid; renderLines(); return; }
+                if (selectedId === pid) { selectedId = null; renderLines(); return; }
+                update(st => {
+                    const t = st.leagueTeams.find(x => x.id === st.teamId);
+                    const a = findPlayer(t, selectedId), b = findPlayer(t, pid);
+                    if (a && b) {
+                        const tmp = a.lineSlot;
+                        a.lineSlot = b.lineSlot;
+                        b.lineSlot = tmp;
+                        a.tempFill = false; b.tempFill = false;
+                    }
+                });
+                selectedId = null;
+                const t2 = getUserTeam();
+                const fresh = getLines(t2.roster.forwards);
+                for (let k = 1; k <= 4; k++) lines[k] = fresh[k];
+                renderLines();
+            };
+        });
+    };
+    renderLines();
 }

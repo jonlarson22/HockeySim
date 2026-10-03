@@ -80,6 +80,8 @@ function generateProspect(position, targetPrestige) {
         injuryWeeks: 0,
         seasonGoals: 0,
         seasonAssists: 0,
+        // Forwards: natural line position. lineSlot assigned when they join a roster.
+        ...(position === 'F' ? { linePos: ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)], lineSlot: null } : {}),
         userPoints: 0,                              // points the user has spent
         rivalInterest: Math.max(0, Math.round((heat - 55) * 3)),
         rivalGrowth: randomInt(15, 25) + Math.floor((heat - 55) * 1.2),

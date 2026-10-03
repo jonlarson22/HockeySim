@@ -1,4 +1,5 @@
 import { getRandomFirstName, getRandomLastName } from './data.js';
+import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr } from './lines.js';
 
 import { 
     generateConferenceQuarterfinals, 
@@ -64,6 +65,7 @@ export function initializeLeague(baseTeams) {
 // Generate a single player
 export function generatePlayer(position, teamPrestige) {
     const isGoalie = position === 'G';
+    const isForward = position === 'F';
     const yearRoll = Math.random();
     
     // Weight class years
@@ -124,16 +126,21 @@ export function generatePlayer(position, teamPrestige) {
         injuryWeeks: 0,
         seasonGoals: 0,
         seasonAssists: 0,
-        roleWeeks: { active: 0, practice: 0, redshirt: 0 }
+        roleWeeks: { active: 0, practice: 0, redshirt: 0 },
+        // Forwards: natural position (C/LW/RW) and home line slot (L1C..L4RW).
+        // lineSlot is the player's "home" — kept through injuries, reclaimed on return.
+        ...(isForward ? { linePos: ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)], lineSlot: null } : {})
     };
 }
 
 // Generate a full initial roster for a newly accepted team
 export function generateTeamRoster(teamPrestige) {
+    const forwards = Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige));
+    autoFormLines(forwards);
     return {
         goalies: Array.from({ length: 3 }, () => generatePlayer('G', teamPrestige)),
         defensemen: Array.from({ length: 8 }, () => generatePlayer('D', teamPrestige)),
-        forwards: Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige))
+        forwards
     };
 }
 
@@ -330,15 +337,20 @@ function calculateTeamRatings(teamId, gameState) {
     const activeGoalies = getActivePlayers(team.roster.goalies);
 
     let offOvr = 0;
-    if (activeForwards.length >= 12) {
-        const g1 = (activeForwards[0].overall + activeForwards[1].overall + activeForwards[2].overall) / 3;
-        const g2 = (activeForwards[3].overall + activeForwards[4].overall + activeForwards[5].overall) / 3;
-        const g3 = (activeForwards[6].overall + activeForwards[7].overall + activeForwards[8].overall) / 3;
-        const g4 = (activeForwards[9].overall + activeForwards[10].overall + activeForwards[11].overall) / 3;
-        offOvr = (g1 * 0.40) + (g2 * 0.30) + (g3 * 0.20) + (g4 * 0.10);
-    } else {
-        offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
+    // Line-based OVR with chemistry: L1 40%, L2 30%, L3 20%, L4 10%.
+    // Each line's effective OVR includes its chemistry bonus (±5%).
+    const fwdLines = getLines(activeForwards);
+    const lineW = [0.40, 0.30, 0.20, 0.10];
+    let wSum = 0;
+    for (let l = 1; l <= 4; l++) {
+        const { C, LW, RW } = fwdLines[l];
+        if (C && LW && RW) {
+            offOvr += lineEffectiveOvr(C, LW, RW) * lineW[l - 1];
+            wSum += lineW[l - 1];
+        }
     }
+    if (wSum > 0) offOvr /= wSum;
+    else offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
 
     let defOvr = 0;
     if (activeDefense.length >= 6) {
@@ -598,16 +610,38 @@ export function simulateWeek(gameState) {
                 player.injuryWeeks--;
                 if (player.injuryWeeks === 0 && player.status === 'Practice Squad') {
                     player.status = 'Active Roster';
+                    // Reclaim home line slot: evict the temp fill-in if there is one.
+                    // If the user deliberately moved someone into the slot, wait
+                    // as a healthy scratch (lineSlot cleared for manual placement).
+                    if (player.lineSlot) {
+                        const occupant = userRoster.forwards.find(p =>
+                            p.id !== player.id && p.lineSlot === player.lineSlot &&
+                            p.status === 'Active Roster' && p.injuryWeeks === 0);
+                        if (occupant && occupant.tempFill) {
+                            occupant.lineSlot = null;
+                            occupant.tempFill = false;
+                            occupant.status = 'Practice Squad';
+                        } else if (occupant) {
+                            player.lineSlot = null;
+                        }
+                    }
                 }
             } else if (player.status === 'Active Roster' && Math.random() < 0.02) {
                 player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
                 player.status = 'Practice Squad';
+                // lineSlot is the player's home — kept through the injury.
                 // Auto-replace with best available practice squad player
                 const allPracticeSquad = [...userRoster.forwards, ...userRoster.defensemen, ...userRoster.goalies]
                     .filter(p => p.status === 'Practice Squad' && p.id !== player.id)
                     .sort((a, b) => b.overall - a.overall);
                 if (allPracticeSquad.length > 0) {
-                    allPracticeSquad[0].status = 'Active Roster';
+                    const sub = allPracticeSquad[0];
+                    sub.status = 'Active Roster';
+                    // Forward line slot: temp fill-in holds the home slot.
+                    if (player.lineSlot && sub.position === 'F' && !sub.lineSlot) {
+                        sub.lineSlot = player.lineSlot;
+                        sub.tempFill = true;
+                    }
                 }
             }
 
