@@ -106,6 +106,12 @@ export const lastNames = [
 export const regularLastNames = lastNames.slice(0, 100);
 export const famousLastNames = lastNames.slice(100);
 
+// Second wave of bloodlines (30 total at the same 4% weight — each one rarer).
+famousLastNames.push(
+  "Richard", "Beliveau", "Lafleur", "Bossy", "Trottier",
+  "Potvin", "Esposito", "Selanne", "Lindros", "McDavid"
+);
+
 // 4. Helper Function: Generate a Random Player Name
 export function getRandomFirstName() {
     return firstNames[Math.floor(Math.random() * firstNames.length)];
