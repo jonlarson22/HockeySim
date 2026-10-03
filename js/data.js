@@ -30,7 +30,7 @@ export const teams = [
     { id: "team_umd", name: "Minnesota Duluth", abbr: "UMD", confId: "conf_wsc", prestige: 70, color: "#A6192E" },
     { id: "team_wmu", name: "Western Michigan", abbr: "WMU", confId: "conf_wsc", prestige: 62, color: "#6C4023" },
     { id: "team_uno", name: "Omaha", abbr: "OMA", confId: "conf_wsc", prestige: 55, color: "#000000" },
-    { id: "team_cc", name: "Colorado College", abbr: "CC", confId: "conf_wsc", prestige: 52, color: "#F2A900" },
+    { id: "team_alaska", name: "Alaska", abbr: "AK", confId: "conf_wsc", prestige: 32, color: "#1D5FA8" },
     { id: "team_mia", name: "Miami", abbr: "MIA", confId: "conf_wsc", prestige: 45, color: "#C8102E" },
     { id: "team_isu", name: "Iowa State", abbr: "ISU", confId: "conf_wsc", prestige: 38, color: "#C8102E" },
     { id: "team_bc", name: "Boston College", abbr: "BC", confId: "conf_yan", prestige: 87, color: "#8C2232" },

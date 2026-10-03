@@ -104,7 +104,7 @@ export function generateConferenceFinals(gameState) {
     gameState.schedule.push(finalGames);
 }
 
-// Determine the top 16 teams and build the bracket
+// Determine the 32-team national tournament field and build the bracket
 export function generateNationalTournament(gameState) {
     const finalGames = gameState.schedule[40]; // Index 40 is Week 41
     let nationalTeams = [];
