@@ -60,6 +60,11 @@ function generateProspect(position, targetPrestige) {
     let potential = randomInt(55, 95);
     if (overall >= potential) potential = Math.min(99, overall + randomInt(1, 6));
 
+    // Recruiting-specific: stars cost more and draw real competition.
+    // Heat = what the market thinks: mostly current ability, with a nod to
+    // upside. A raw 60/95 (heat 70.5) draws nearly as much attention as a
+    // polished 74/76 (heat 74.6) — and way more than a 60/60 (heat 60).
+    const heat = overall + (potential - overall) * 0.3;
     return {
         id: 'rec_' + Math.random().toString(36).substring(2, 9),
         firstName: getRandomFirstName(),
@@ -75,14 +80,10 @@ function generateProspect(position, targetPrestige) {
         injuryWeeks: 0,
         seasonGoals: 0,
         seasonAssists: 0,
-        // Recruiting-specific: stars cost more and draw real competition.
-        // - commitThreshold scales with quality (the star premium)
-        // - rivalInterest starts above zero for hot prospects (everyone's already on them)
-        // - rivalGrowth scales with quality (hesitate and the elite gets away)
         userPoints: 0,                              // points the user has spent
-        rivalInterest: Math.max(0, Math.round((overall - 55) * 3)),
-        rivalGrowth: randomInt(15, 25) + Math.floor((overall - 55) * 1.2),
-        commitThreshold: Math.round(110 + (overall - 55) * 2.5 + randomInt(0, 30)),
+        rivalInterest: Math.max(0, Math.round((heat - 55) * 3)),
+        rivalGrowth: randomInt(15, 25) + Math.floor((heat - 55) * 1.2),
+        commitThreshold: Math.round(110 + (heat - 55) * 2.5 + randomInt(0, 30)),
         isUserTarget: false,
         signedBy: null                              // teamId, 'rival', or null
     };
