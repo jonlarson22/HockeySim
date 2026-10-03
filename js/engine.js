@@ -332,7 +332,7 @@ function getActivePlayers(players) {
     return players.filter(p => p.status === 'Active Roster').sort((a, b) => b.overall - a.overall);
 }
 
-function calculateTeamRatings(teamId, gameState) {
+export function calculateTeamRatings(teamId, gameState) {
     const team = gameState.leagueTeams.find(t => t.id === teamId);
     
     const activeForwards = getActivePlayers(team.roster.forwards);
