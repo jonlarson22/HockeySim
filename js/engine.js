@@ -1,4 +1,8 @@
-import { getRandomFirstName, getRandomLastName, conferences } from './data.js';
+import { getRandomFirstName, getRandomLastName, conferences, teams as baseTeams } from './data.js';
+
+// Designed league-average prestige (the 25–90 spread's center). The offseason
+// peg recenters on this so the league mean can't inflate over the decades.
+const DESIGN_MEAN = baseTeams.reduce((a, t) => a + t.prestige, 0) / baseTeams.length;
 import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole } from './lines.js';
 
 import { 
@@ -998,6 +1002,18 @@ export function processOffSeason(gameState) {
         team.prestige = Math.max(1, Math.min(99, p + drift + randomInt(-1, 1)));
     });
 
+    // League-wide prestige peg: recenter the mean on its designed value so
+    // the league can't inflate over time. Every team shifts equally, so
+    // relative order, gaps, and conference mobility are untouched — it only
+    // deletes background inflation. (Grading on a curve.)
+    const mean = gameState.leagueTeams.reduce((a, t) => a + (t.prestige || 50), 0) / gameState.leagueTeams.length;
+    const offset = mean - DESIGN_MEAN;
+    if (offset !== 0) {
+        gameState.leagueTeams.forEach(t => {
+            t.prestige = Math.max(1, Math.min(99, Math.round((t.prestige || 50) - offset)));
+        });
+    }
+
     // Conference realignment: strong programs in weak leagues get invited up;
     // collapsing powers get sent down. Rare (max 2 swaps/year), and a moved
     // team must prove itself for 4 seasons before moving again. Not soccer —
@@ -1033,14 +1049,14 @@ export function conferenceRealignment(gameState) {
         // Find a stronger conference with a clear gap that would take them.
         for (let j = 0; j < Math.floor(ranked.length / 2) && swaps < 2; j++) {
             const strongId = ranked[j];
-            if (confAvg[strongId] - confAvg[weakId] < 15) continue;
-            // They need to be a proven power (65+) and competitive up there.
-            if (up.prestige < 65 || up.prestige < confAvg[strongId] - 10) continue;
+            if (confAvg[strongId] - confAvg[weakId] < 12) continue;
+            // They need to dominate their league (15+ above its average) and be
+            // competitive up there (within 10 of the new average).
+            if (up.prestige < confAvg[weakId] + 15 || up.prestige < confAvg[strongId] - 10) continue;
             const strongTeams = confTeams[strongId].filter(t => (t.seasonsInConf ?? 4) >= 4 && t.id !== gameState.teamId);
             if (!strongTeams.length) continue;
-            // The weakest team in the strong conference goes down.
+            // The weakest team in the strong conference makes room and goes down.
             const down = [...strongTeams].sort((a, b) => a.prestige - b.prestige)[0];
-            if (down.prestige > confAvg[weakId] + 10) continue;
             // User's team: invite, don't force. AI teams move automatically.
             if (up.id === gameState.teamId) {
                 (gameState.realignmentInvites = gameState.realignmentInvites || []).push({
