@@ -3,7 +3,7 @@
 // season that just ended.
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
-import { beginOffseason } from '../actions.js';
+import { resolveSeason } from '../actions.js';
 import { nationalRank } from '../engine.js';
 import { tourneyRuns } from '../career.js';
 import { conferences } from '../data.js';
@@ -66,11 +66,11 @@ export function render(container) {
                     </div>
                 </div>
             </div>
-            <button id="recap-offseason" class="primary" style="width: 100%; margin-top: 20px;">Proceed to Offseason Recruiting</button>
+            <button id="recap-offseason" class="primary" style="width: 100%; margin-top: 20px;">Continue to Offseason</button>
         </div>`;
 
     container.querySelector('#recap-offseason').onclick = () => {
-        beginOffseason();
-        showScreen('recruiting');
+        resolveSeason();
+        showScreen('carousel');
     };
 }

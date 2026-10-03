@@ -4,6 +4,7 @@
 import { getState, update } from './store.js';
 import { showScreen } from './router.js';
 import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
+import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
 import { generateProspectPool, processRecruitingWeek } from './recruiting.js';
 import { conferences } from './data.js';
 
@@ -33,20 +34,12 @@ export function goAfterSimWeek(weekIndex, seasonActive) {
 // and opens the 5-week recruiting period. Called from the season recap screen.
 export function beginOffseason() {
     update(state => {
-        const team = state.leagueTeams.find(t => t.id === state.teamId);
-        state.coach.history.push({
-            year: state.year,
-            teamName: team ? team.name : '—',
-            wins: team ? team.wins || 0 : 0,
-            losses: team ? team.losses || 0 : 0,
-            otl: team ? team.otl || 0 : 0,
-            rank: nationalRank(state.leagueTeams, state.teamId)
-        });
         processOffSeason(state);
         refillAIRosters(state);
         state.recruitingWeek = 1;
         state.recruitWeekAlloc = {};
         state.prospectPool = generateProspectPool();
+        state.seasonResolution = null;
     });
 }
 
@@ -72,6 +65,41 @@ function refillAIRosters(state) {
 
 // Submits the user's point allocations for the current recruiting week.
 // Returns { logs, done } — done when all 5 weeks are complete.
+// Grades the finished season, applies prestige/XP consequences, and decides
+// the coach's fate. Called once from the season recap screen; the carousel
+// screen then presents the outcome.
+export function resolveSeason() {
+    update(state => {
+        const team = state.leagueTeams.find(t => t.id === state.teamId);
+        const grade = gradeSeason(state, team);
+        state.coach.history.push({
+            year: state.year,
+            teamName: team ? team.name : '—',
+            wins: team ? team.wins || 0 : 0,
+            losses: team ? team.losses || 0 : 0,
+            otl: team ? team.otl || 0 : 0,
+            rank: nationalRank(state.leagueTeams, state.teamId),
+            result: grade.result,
+            expectation: grade.expectation
+        });
+        applySeasonConsequences(state, team, grade);
+        const xpGained = awardCoachXP(state, team, grade);
+        const fired = (state.coach.missStreak || 0) >= 2;
+        if (fired) state.coach.prestige = Math.max(1, (state.coach.prestige ?? 15) - 10);
+        state.seasonResolution = {
+            grade,
+            fired,
+            xpGained,
+            offers: fired ? [] : jobOffers(state).map(t => t.id),
+            openings: fired ? firedOpenings(state).map(t => t.id) : []
+        };
+    });
+}
+
+export function changeTeam(teamId) {
+    update(state => { state.teamId = teamId; });
+}
+
 export function submitRecruitingWeek() {
     let logs = [];
     let done = false;

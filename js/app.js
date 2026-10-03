@@ -15,6 +15,7 @@ import * as SeasonRecapScreen from './screens/seasonRecap.js';
 import * as RecruitingScreen from './screens/recruiting.js';
 import * as RecruitingRecapScreen from './screens/recruitingRecap.js';
 import * as GameDayScreen from './screens/gameDay.js';
+import * as CarouselScreen from './screens/carousel.js';
 
 registerScreen('menu', MenuScreen);
 registerScreen('coach-creation', CoachCreationScreen);
@@ -29,5 +30,6 @@ registerScreen('season-recap', SeasonRecapScreen);
 registerScreen('recruiting', RecruitingScreen);
 registerScreen('recruiting-recap', RecruitingRecapScreen);
 registerScreen('game-day', GameDayScreen);
+registerScreen('carousel', CarouselScreen);
 
 showScreen('menu');
