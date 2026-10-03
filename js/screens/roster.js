@@ -73,13 +73,13 @@ export function render(container) {
                 ? `<span style="background:#8b0000;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:5px;border:1px solid #ff0000;">INJ (${p.injuryWeeks}W)</span>` : '';
             const posTag = p.linePos ? `<span style="color:#93c5fd;font-size:0.85em;margin-left:8px;">${p.linePos} · ${getRole(p)}</span>` : '';
             return `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;">
-                    <a href="#" class="player-link" data-id="${p.id}" style="color:var(--accent);text-decoration:none;display:flex;align-items:center;">
+                <div class="roster-row" style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;">
+                    <a href="#" class="player-link" data-id="${p.id}" style="color:var(--accent);text-decoration:none;display:flex;align-items:center;flex-wrap:wrap;row-gap:4px;min-width:0;">
                         <span style="background:#444;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:5px;border:1px solid #555;">OVR: ${p.overall}</span>
                         <span style="background:#1e3a8a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:10px;border:1px solid #3b82f6;">POT: ${p.potential}</span>
                         ${injuryTag}
                         ${esc(p.firstName)} ${esc(p.lastName)} <span style="color:#aaa;font-size:0.9em;margin-left:5px;">(${p.year})</span>${posTag}
-                        <span style="color:#4ade80;font-size:0.85em;margin-left:8px;white-space:nowrap;" title="Season stats">${p.position === 'G'
+                        <span class="player-stats" style="color:#4ade80;font-size:0.85em;margin-left:8px;white-space:nowrap;" title="Season stats">${p.position === 'G'
                             ? `${p.seasonWins || 0}W ${p.seasonLosses || 0}L ${p.seasonShutouts || 0}SO`
                             : `${p.seasonGoals || 0}G ${p.seasonAssists || 0}A ${(p.seasonGoals || 0) + (p.seasonAssists || 0)}P ${((p.seasonPlusMinus || 0) >= 0 ? '+' : '') + (p.seasonPlusMinus || 0)} ${p.seasonPIM || 0}PIM`}</span>
                     </a>

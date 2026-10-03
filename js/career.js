@@ -6,10 +6,11 @@ const CONF_WEEKS = [
     { idx: 40, label: 'Finals' }
 ];
 const NAT_WEEKS = [
-    { idx: 41, label: 'Round of 16' },
-    { idx: 42, label: 'Quarterfinals' },
-    { idx: 43, label: 'Semifinals' },
-    { idx: 44, label: 'Championship' }
+    { idx: 41, label: 'Round of 32' },
+    { idx: 42, label: 'Round of 16' },
+    { idx: 43, label: 'Quarterfinals' },
+    { idx: 44, label: 'Semifinals' },
+    { idx: 45, label: 'Championship' }
 ];
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -54,8 +55,8 @@ export function gradeSeason(state, team) {
     let result = 'missed';
     switch (exp.key) {
         case 'contend':
-            if (nat.won >= 3) result = 'exceeded';
-            else if (nat.won >= 2) result = 'met';
+            if (nat.won >= 4) result = 'exceeded';
+            else if (nat.won >= 3) result = 'met';
             break;
         case 'tourney':
             if (nat.won >= 2) result = 'exceeded';
@@ -75,7 +76,7 @@ export function gradeSeason(state, team) {
         result,
         confRounds: runs.conf.won,
         natRounds: nat.won,
-        champion: nat.won >= 4,
+        champion: nat.won >= 5,
         confChampion: runs.conf.won >= 3,
         confLabel: runs.conf.label,
         natLabel: nat.label

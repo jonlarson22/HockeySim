@@ -8,12 +8,6 @@ import { dripPerWeek, MAX_RECRUIT_TARGETS } from '../recruiting.js';
 import { conferences } from '../data.js';
 import { esc, scheduleLabel } from '../ui.js';
 
-function shortName(name) {
-    if (name.startsWith('New ') || name.startsWith('Rhode ')) {
-        return name.split(' ').slice(0, 2).join(' ');
-    }
-    return name.split(' ')[0];
-}
 
 export function render(container) {
     const s = getState();
@@ -37,7 +31,7 @@ export function render(container) {
     const top25 = [...s.leagueTeams].sort((a, b) => pollScore(b, s.leagueTeams, s.schedule) - pollScore(a, s.leagueTeams, s.schedule)).slice(0, 25);
     const top25HTML = top25.map((t, i) => {
         const mine = t.id === team.id ? ` style="color:${t.color};font-weight:bold;"` : '';
-        return `<li${mine}><span style="font-size:0.9em;">#${i + 1} ${esc(shortName(t.name))}</span> <span style="float:right;color:#888;font-size:0.9em;">${t.wins || 0}-${t.losses || 0}-${t.otl || 0}</span></li>`;
+        return `<li${mine}><span style="font-size:0.9em;">#${i + 1} ${esc(t.abbr || t.name)}</span> <span style="float:right;color:#888;font-size:0.9em;">${t.wins || 0}-${t.losses || 0}-${t.otl || 0}</span></li>`;
     }).join('');
 
     const confOptions = conferences.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
