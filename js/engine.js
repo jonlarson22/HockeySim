@@ -123,7 +123,8 @@ export function generatePlayer(position, teamPrestige) {
         redshirtUsed: false,
         injuryWeeks: 0,
         seasonGoals: 0,
-        seasonAssists: 0
+        seasonAssists: 0,
+        roleWeeks: { active: 0, practice: 0, redshirt: 0 }
     };
 }
 
@@ -610,9 +611,19 @@ export function simulateWeek(gameState) {
                 }
             }
 
+            // Track which role the player filled this week (drives offseason math).
+            if (!player.roleWeeks) player.roleWeeks = { active: 0, practice: 0, redshirt: 0 };
+            if (player.status === 'Active Roster') player.roleWeeks.active++;
+            else if (player.status === 'Practice Squad') player.roleWeeks.practice++;
+            else if (player.status === 'Redshirt') player.roleWeeks.redshirt++;
+
             const gap = player.potential - player.overall;
             if (gap > 0) {
-                const progressionChance = 0.15 + ((coachDev / 30) * 0.20) + (gap * 0.005); 
+                // Weekly growth scales with role: actives play, practice squad
+                // trains, redshirts develop — mirroring the offseason ratios.
+                const roleFactor = player.status === 'Active Roster' ? 1.0
+                    : player.status === 'Practice Squad' ? 0.5 : 0.33;
+                const progressionChance = (0.15 + ((coachDev / 30) * 0.20) + (gap * 0.005)) * roleFactor;
                 if (Math.random() < progressionChance) {
                     const statKeys = Object.keys(player.stats);
                     const focusPool = focusStatPool(gameState.trainingFocus, statKeys);
@@ -646,6 +657,19 @@ export function simulateWeek(gameState) {
     return true;
 }
 
+// Which role a player actually filled most of the season, based on tracked
+// weekly status. A 44-game starter who finishes the year hurt on the practice
+// squad still counts as active — the offseason shouldn't punish the last week.
+// Falls back to current status when nothing was tracked (AI teams, legacy saves).
+export function majorityRole(player) {
+    const rw = player.roleWeeks || { active: 0, practice: 0, redshirt: 0 };
+    const a = rw.active || 0, p = rw.practice || 0, r = rw.redshirt || 0;
+    if (a + p + r === 0) return player.status || 'Active Roster';
+    if (r >= a && r >= p) return 'Redshirt';
+    if (p > a) return 'Practice Squad';
+    return 'Active Roster';
+}
+
 export function processOffSeason(gameState) {
     const coachDev = gameState.coach.skills.development || 5;
 
@@ -659,10 +683,14 @@ export function processOffSeason(gameState) {
         allReturning.forEach(player => {
             player.seasonGoals = 0;
             player.seasonAssists = 0;
+            // Offseason math keys off the role the player actually filled most
+            // of the season — not whatever their status happens to be this week.
+            const seasonRole = majorityRole(player);
+            player.roleWeeks = { active: 0, practice: 0, redshirt: 0 };
             let boostChance = 0;
-            if (player.status === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
-            else if (player.status === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
-            else if (player.status === 'Redshirt') {
+            if (seasonRole === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
+            else if (seasonRole === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
+            else if (seasonRole === 'Redshirt') {
                 boostChance = 0.20 + (coachDev * 0.01);
                 player.redshirtUsed = true; 
             }
@@ -682,7 +710,7 @@ export function processOffSeason(gameState) {
                 player.overall = Math.round(statTotal / statKeys.length);
             }
 
-            if (player.status !== 'Redshirt') {
+            if (seasonRole !== 'Redshirt') {
                 if (player.year === 'Jr') player.year = 'Sr';
                 if (player.year === 'So') player.year = 'Jr';
                 if (player.year === 'Fr') player.year = 'So';
