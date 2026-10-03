@@ -1,4 +1,5 @@
 import { getRandomFirstName, getRandomLastName } from './data.js';
+import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole } from './lines.js';
 
 import { 
     generateConferenceQuarterfinals, 
@@ -15,6 +16,27 @@ import { generateProspectPool, calculateRecruitingPoints } from './recruiting.js
 // Helper to generate a random number within a range
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Training focus groups. 'balanced' (or unset) = no focus.
+const FOCUS_STATS = {
+    offense: ['shooting', 'passing'],
+    defense: ['defense'],
+    physical: ['physicality', 'skating'],
+    goaltending: ['reflexes', 'positioning']
+};
+
+export const TRAINING_FOCUSES = [
+    { key: 'balanced', label: 'Balanced' },
+    { key: 'offense', label: 'Offense (shooting, passing)' },
+    { key: 'defense', label: 'Defense' },
+    { key: 'physical', label: 'Physical (hitting, skating)' },
+    { key: 'goaltending', label: 'Goaltending' }
+];
+
+function focusStatPool(focus, statKeys) {
+    if (!focus || focus === 'balanced' || !FOCUS_STATS[focus]) return [];
+    return statKeys.filter(k => FOCUS_STATS[focus].includes(k));
 }
 
 // NEW: Initialize the league with randomized prestige and zeroed records
@@ -41,8 +63,9 @@ export function initializeLeague(baseTeams) {
 }
 
 // Generate a single player
-function generatePlayer(position, teamPrestige) {
+export function generatePlayer(position, teamPrestige) {
     const isGoalie = position === 'G';
+    const isForward = position === 'F';
     const yearRoll = Math.random();
     
     // Weight class years
@@ -82,11 +105,9 @@ function generatePlayer(position, teamPrestige) {
     }
     const overall = Math.round(statTotal / statCount);
 
-    let potential = randomInt(55, 95);
-    if (overall >= potential) {
-        potential = overall + randomInt(1, 6); 
-        if (potential > 99) potential = 99;
-    }
+    // Potential is always higher than starting OVR (except at the 99 cap,
+    // where there's nothing left to grow into).
+    let potential = Math.min(99, Math.max(randomInt(55, 99), overall + 1));
 
     return {
         id: 'p_' + Math.random().toString(36).substring(2, 9),
@@ -100,16 +121,24 @@ function generatePlayer(position, teamPrestige) {
         status: 'Active Roster',
         eligibilityYears: 4,
         redshirtUsed: false,
-        injuryWeeks: 0
+        injuryWeeks: 0,
+        seasonGoals: 0,
+        seasonAssists: 0,
+        roleWeeks: { active: 0, practice: 0, redshirt: 0 },
+        // Forwards: natural position (C/LW/RW) and home line slot (L1C..L4RW).
+        // lineSlot is the player's "home" — kept through injuries, reclaimed on return.
+        ...(isForward ? { linePos: ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)], lineSlot: null } : {})
     };
 }
 
 // Generate a full initial roster for a newly accepted team
 export function generateTeamRoster(teamPrestige) {
+    const forwards = Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige));
+    autoFormLines(forwards);
     return {
         goalies: Array.from({ length: 3 }, () => generatePlayer('G', teamPrestige)),
         defensemen: Array.from({ length: 8 }, () => generatePlayer('D', teamPrestige)),
-        forwards: Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige))
+        forwards
     };
 }
 
@@ -306,15 +335,20 @@ function calculateTeamRatings(teamId, gameState) {
     const activeGoalies = getActivePlayers(team.roster.goalies);
 
     let offOvr = 0;
-    if (activeForwards.length >= 12) {
-        const g1 = (activeForwards[0].overall + activeForwards[1].overall + activeForwards[2].overall) / 3;
-        const g2 = (activeForwards[3].overall + activeForwards[4].overall + activeForwards[5].overall) / 3;
-        const g3 = (activeForwards[6].overall + activeForwards[7].overall + activeForwards[8].overall) / 3;
-        const g4 = (activeForwards[9].overall + activeForwards[10].overall + activeForwards[11].overall) / 3;
-        offOvr = (g1 * 0.40) + (g2 * 0.30) + (g3 * 0.20) + (g4 * 0.10);
-    } else {
-        offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
+    // Line-based OVR with chemistry: L1 40%, L2 30%, L3 20%, L4 10%.
+    // Each line's effective OVR includes its chemistry bonus (±5%).
+    const fwdLines = getLines(activeForwards);
+    const lineW = [0.40, 0.30, 0.20, 0.10];
+    let wSum = 0;
+    for (let l = 1; l <= 4; l++) {
+        const { C, LW, RW } = fwdLines[l];
+        if (C && LW && RW) {
+            offOvr += lineEffectiveOvr(C, LW, RW) * lineW[l - 1];
+            wSum += lineW[l - 1];
+        }
     }
+    if (wSum > 0) offOvr /= wSum;
+    else offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
 
     let defOvr = 0;
     if (activeDefense.length >= 6) {
@@ -335,12 +369,208 @@ function calculateTeamRatings(teamId, gameState) {
         coachOffBoost = 3 * ((gameState.coach.skills.offense || 3) / 30);
         coachDefBoost = 3 * ((gameState.coach.skills.defense || 3) / 30);
     } else {
-        const estimatedSkill = (team.prestige / 100) * 30;
+        // Compressed range: good programs hire better coaches, but prestige
+        // already pays through talent — this is a nudge, not a second tax.
+        const estimatedSkill = 10 + (team.prestige / 100) * 10;
         coachOffBoost = 3 * (estimatedSkill / 30);
         coachDefBoost = 3 * (estimatedSkill / 30);
     }
 
     return { offense: offOvr, defense: defOvr, goalie: goalieOvr, coachOffBoost, coachDefBoost };
+}
+
+// Weighted random forward: top-line players score more often.
+function weightedForward(forwards, excludeIds = []) {
+    const pool = forwards.filter(p => !excludeIds.includes(p.id));
+    if (pool.length === 0) return null;
+    const weights = pool.map(p => Math.pow(p.overall, 2));
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < pool.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+}
+
+// Builds a period-by-period goal log for an already-simmed game. The final
+// score is drawn exactly as before; this only distributes those goals across
+// periods and attaches scorer/assist names so the game-day screen can replay
+// the game. Regulation goals go to periods 1-3; the OT winner gets period 4.
+export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT) {
+    const periodWeights = [0.32, 0.34, 0.34];
+    // Forwards drive the offense; defensemen chip in at a reduced weight.
+    // Final scores are drawn before this runs — this only assigns credit.
+    const skaterPool = (team) => [
+        ...getActivePlayers(team.roster.forwards).map(p => ({ p, w: p.overall * p.overall })),
+        ...getActivePlayers(team.roster.defensemen).map(p => ({ p, w: p.overall * p.overall * 0.25 }))
+    ];
+    const homeSkaters = skaterPool(homeTeam);
+    const awaySkaters = skaterPool(awayTeam);
+    const events = [];
+
+    const weightedScorer = (skaters, excludeIds = []) => {
+        const pool = skaters.filter(s => !excludeIds.includes(s.p.id));
+        if (!pool.length) return null;
+        let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
+        for (const s of pool) {
+            r -= s.w;
+            if (r <= 0) return s.p;
+        }
+        return pool[pool.length - 1].p;
+    };
+
+    const makeGoal = (team, skaters, period) => {
+        const scorer = weightedScorer(skaters) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
+        const a1 = Math.random() < 0.85 ? weightedScorer(skaters, [scorer.id]) : null;
+        const a2 = a1 && Math.random() < 0.6 ? weightedScorer(skaters, [scorer.id, a1.id]) : null;
+        events.push({
+            period,
+            minute: Math.floor(Math.random() * 20) + 1,
+            second: Math.floor(Math.random() * 60),
+            teamId: team.id,
+            scorer: `${scorer.firstName} ${scorer.lastName}`,
+            scorerId: scorer.id,
+            assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`),
+            assistIds: [a1, a2].filter(Boolean).map(a => a.id),
+            // ~25% of regulation goals come on the power play. Pure label —
+            // the final score was drawn before this runs. No PP in OT (3v3).
+            isPP: period < 4 && Math.random() < 0.25
+        });
+    };
+
+    const dealGoals = (team, skaters, count) => {
+        for (let i = 0; i < count; i++) {
+            const roll = Math.random();
+            let period = 3, acc = 0;
+            for (let p = 0; p < 3; p++) {
+                acc += periodWeights[p];
+                if (roll <= acc) { period = p + 1; break; }
+            }
+            makeGoal(team, skaters, period);
+        }
+    };
+
+    // The OT goal was already counted in the final score; re-deal it as period 4.
+    const homeOT = wentOT && homeGoals > awayGoals ? 1 : 0;
+    const awayOT = wentOT && awayGoals > homeGoals ? 1 : 0;
+    dealGoals(homeTeam, homeSkaters, homeGoals - homeOT);
+    dealGoals(awayTeam, awaySkaters, awayGoals - awayOT);
+
+    if (wentOT) {
+        const winner = homeGoals > awayGoals ? homeTeam : awayTeam;
+        makeGoal(winner, winner === homeTeam ? homeSkaters : awaySkaters, 4);
+    }
+
+    // Chronological order, then attach the running score to each event.
+    events.sort((a, b) => a.period - b.period || a.minute - b.minute || a.second - b.second);
+    let hs = 0, as = 0;
+    events.forEach(e => {
+        if (e.teamId === homeTeam.id) hs++; else as++;
+        e.homeScore = hs;
+        e.awayScore = as;
+    });
+
+    return events;
+}
+
+// Adds G/A from a game's events to the roster players' season totals.
+// Runs for every league game (only the user's game keeps the event objects).
+export function accumulateGameStats(homeTeam, awayTeam, events) {
+    const find = (team, id) => {
+        for (const key of ['forwards', 'defensemen', 'goalies']) {
+            const p = team.roster[key].find(x => x.id === id);
+            if (p) return p;
+        }
+        return null;
+    };
+    for (const e of events) {
+        if (!e.scorerId || e.scorerId === 'none') continue;
+        const team = e.teamId === homeTeam.id ? homeTeam : awayTeam;
+        const scorer = find(team, e.scorerId);
+        if (scorer) {
+            scorer.seasonGoals = (scorer.seasonGoals || 0) + 1;
+            if (e.isPP) scorer.seasonPPG = (scorer.seasonPPG || 0) + 1;
+        }
+        for (const aid of e.assistIds || []) {
+            const a = find(team, aid);
+            if (a) a.seasonAssists = (a.seasonAssists || 0) + 1;
+        }
+    }
+
+    const activeSkaters = (team) => [
+        ...team.roster.forwards.filter(p => p.status === 'Active Roster' && !p.injuryWeeks),
+        ...team.roster.defensemen.filter(p => p.status === 'Active Roster' && !p.injuryWeeks)
+    ];
+
+    // Plus/minus: even-strength goals only (real hockey skips +/- on power plays).
+    for (const e of events) {
+        if (!e.scorerId || e.scorerId === 'none' || e.isPP) continue;
+        const scored = e.teamId === homeTeam.id ? homeTeam : awayTeam;
+        const conceded = scored === homeTeam ? awayTeam : homeTeam;
+        for (const p of activeSkaters(scored)) p.seasonPlusMinus = (p.seasonPlusMinus || 0) + 1;
+        for (const p of activeSkaters(conceded)) p.seasonPlusMinus = (p.seasonPlusMinus || 0) - 1;
+    }
+
+    // Penalties: 3-7 minors per team per game, Power Forwards take more.
+    // Pure annotation — does not affect the final score.
+    for (const team of [homeTeam, awayTeam]) {
+        const skaters = activeSkaters(team);
+        if (!skaters.length) continue;
+        const weights = skaters.map(p => getRole(p) === 'Power Forward' ? 2 : 1);
+        const totalW = weights.reduce((a, b) => a + b, 0);
+        for (let i = 0, minors = randomInt(3, 7); i < minors; i++) {
+            let r = Math.random() * totalW;
+            for (let j = 0; j < skaters.length; j++) {
+                r -= weights[j];
+                if (r <= 0) { skaters[j].seasonPIM = (skaters[j].seasonPIM || 0) + 2; break; }
+            }
+        }
+    }
+
+    // Goalie saves: shots faced minus goals allowed. Same shot formula as
+    // buildGameShots (goals*7 + 3-8 per period, ~4 periods per game).
+    const getActive = (roster) => roster.filter(p => p.status === 'Active Roster' && !p.injuryWeeks);
+    const homeGoalie = getActive(homeTeam.roster.goalies)[0];
+    const awayGoalie = getActive(awayTeam.roster.goalies)[0];
+    const homeGoals = events.filter(e => e.teamId === homeTeam.id && e.scorerId && e.scorerId !== 'none').length;
+    const awayGoals = events.filter(e => e.teamId === awayTeam.id && e.scorerId && e.scorerId !== 'none').length;
+    if (homeGoalie) {
+        const sa = awayGoals * 7 + randomInt(12, 32);
+        homeGoalie.seasonSaves = (homeGoalie.seasonSaves || 0) + Math.max(0, sa - awayGoals);
+        homeGoalie.seasonShotsAgainst = (homeGoalie.seasonShotsAgainst || 0) + sa;
+        if (awayGoals === 0) homeGoalie.seasonShutouts = (homeGoalie.seasonShutouts || 0) + 1;
+        if (homeGoals > awayGoals) homeGoalie.seasonWins = (homeGoalie.seasonWins || 0) + 1;
+        else if (awayGoals > homeGoals) homeGoalie.seasonLosses = (homeGoalie.seasonLosses || 0) + 1;
+    }
+    if (awayGoalie) {
+        const sa = homeGoals * 7 + randomInt(12, 32);
+        awayGoalie.seasonSaves = (awayGoalie.seasonSaves || 0) + Math.max(0, sa - homeGoals);
+        awayGoalie.seasonShotsAgainst = (awayGoalie.seasonShotsAgainst || 0) + sa;
+        if (homeGoals === 0) awayGoalie.seasonShutouts = (awayGoalie.seasonShutouts || 0) + 1;
+        if (awayGoals > homeGoals) awayGoalie.seasonWins = (awayGoalie.seasonWins || 0) + 1;
+        else if (homeGoals > awayGoals) awayGoalie.seasonLosses = (awayGoalie.seasonLosses || 0) + 1;
+    }
+}
+
+// Derives per-period shots and saves from a game's goal events.
+// Pure annotation: the final score was drawn before this runs.
+// saves.home[p] = home goalie's saves in period p (1-based index p-1).
+export function buildGameShots(homeTeam, awayTeam, events) {
+    const shots = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
+    const goals = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
+    for (const e of events) {
+        const side = e.teamId === homeTeam.id ? 'home' : 'away';
+        if (e.period >= 1 && e.period <= 4) goals[side][e.period - 1]++;
+    }
+    for (const side of ['home', 'away']) {
+        for (let p = 0; p < 4; p++) shots[side][p] = goals[side][p] * 7 + randomInt(3, 8);
+    }
+    const saves = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
+    for (let p = 0; p < 4; p++) {
+        saves.home[p] = Math.max(0, shots.away[p] - goals.away[p]);
+        saves.away[p] = Math.max(0, shots.home[p] - goals.home[p]);
+    }
+    return { shots, saves };
 }
 
 // --- SIMULATION ENGINE ---
@@ -370,8 +600,8 @@ export function simulateWeek(gameState) {
         const awayDefenseScore = (awayRatings.defense * 0.5) + (awayRatings.goalie * 0.5) + awayRatings.coachDefBoost;
 
         const SCALING_FACTOR = 8;
-        let homeExpectedGoals = 2 + ((homeOffenseScore - awayDefenseScore) / SCALING_FACTOR);
-        let awayExpectedGoals = 2 + ((awayOffenseScore - homeDefenseScore) / SCALING_FACTOR);
+        let homeExpectedGoals = 2.5 + ((homeOffenseScore - awayDefenseScore) / SCALING_FACTOR);
+        let awayExpectedGoals = 2.5 + ((awayOffenseScore - homeDefenseScore) / SCALING_FACTOR);
 
         let homeGoals = Math.max(0, Math.round(homeExpectedGoals + (Math.random() * 3 - 1.5)));
         let awayGoals = Math.max(0, Math.round(awayExpectedGoals + (Math.random() * 3 - 1.5)));
@@ -379,7 +609,10 @@ export function simulateWeek(gameState) {
         let isOT = false;
         if (homeGoals === awayGoals) {
             isOT = true;
-            if (Math.random() > 0.5) homeGoals++;
+            // Weighted OT: the team that "deserved" it in regulation
+            // (by expected-goals edge) wins more overtimes.
+            const pHome = Math.min(0.8, Math.max(0.2, 0.5 + (homeExpectedGoals - awayExpectedGoals) * 0.15));
+            if (Math.random() < pHome) homeGoals++;
             else awayGoals++;
         }
 
@@ -387,6 +620,15 @@ export function simulateWeek(gameState) {
         game.awayScore = awayGoals;
         game.ot = isOT;
         game.played = true;
+
+        // Goal events feed season stats league-wide; the event objects are
+        // kept only for the user's game (drives the game-day screen).
+        const events = buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, isOT);
+        accumulateGameStats(homeTeam, awayTeam, events);
+        if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
+            game.events = events;
+            game.shots = buildGameShots(homeTeam, awayTeam, events);
+        }
 
         if (homeGoals > awayGoals) {
             homeTeam.wins = (homeTeam.wins || 0) + 1;
@@ -414,34 +656,74 @@ export function simulateWeek(gameState) {
     });
     
     // --- INJURY MANAGEMENT & PROGRESSION ---
-    if (gameState.roster) {
+    // Roster lives on the user's team object (see store.js) — never a top-level duplicate.
+    const userTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+    const userRoster = userTeam ? userTeam.roster : null;
+    if (userRoster) {
         const coachDev = gameState.coach.skills.development || 5;
-        const allPlayers = [...gameState.roster.goalies, ...gameState.roster.defensemen, ...gameState.roster.forwards];
+        const allPlayers = [...userRoster.goalies, ...userRoster.defensemen, ...userRoster.forwards];
         
         allPlayers.forEach(player => {
             if (player.injuryWeeks > 0) {
                 player.injuryWeeks--;
                 if (player.injuryWeeks === 0 && player.status === 'Practice Squad') {
                     player.status = 'Active Roster';
+                    // Reclaim home line slot: evict the temp fill-in if there is one.
+                    // If the user deliberately moved someone into the slot, wait
+                    // as a healthy scratch (lineSlot cleared for manual placement).
+                    if (player.lineSlot) {
+                        const occupant = userRoster.forwards.find(p =>
+                            p.id !== player.id && p.lineSlot === player.lineSlot &&
+                            p.status === 'Active Roster' && p.injuryWeeks === 0);
+                        if (occupant && occupant.tempFill) {
+                            occupant.lineSlot = null;
+                            occupant.tempFill = false;
+                            occupant.status = 'Practice Squad';
+                        } else if (occupant) {
+                            player.lineSlot = null;
+                        }
+                    }
                 }
             } else if (player.status === 'Active Roster' && Math.random() < 0.02) {
                 player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
                 player.status = 'Practice Squad';
+                // lineSlot is the player's home — kept through the injury.
                 // Auto-replace with best available practice squad player
-                const allPracticeSquad = [...gameState.roster.forwards, ...gameState.roster.defensemen, ...gameState.roster.goalies]
+                const allPracticeSquad = [...userRoster.forwards, ...userRoster.defensemen, ...userRoster.goalies]
                     .filter(p => p.status === 'Practice Squad' && p.id !== player.id)
                     .sort((a, b) => b.overall - a.overall);
                 if (allPracticeSquad.length > 0) {
-                    allPracticeSquad[0].status = 'Active Roster';
+                    const sub = allPracticeSquad[0];
+                    sub.status = 'Active Roster';
+                    // Forward line slot: temp fill-in holds the home slot.
+                    if (player.lineSlot && sub.position === 'F' && !sub.lineSlot) {
+                        sub.lineSlot = player.lineSlot;
+                        sub.tempFill = true;
+                    }
                 }
             }
 
+            // Track which role the player filled this week (drives offseason math).
+            if (!player.roleWeeks) player.roleWeeks = { active: 0, practice: 0, redshirt: 0 };
+            if (player.status === 'Active Roster') player.roleWeeks.active++;
+            else if (player.status === 'Practice Squad') player.roleWeeks.practice++;
+            else if (player.status === 'Redshirt') player.roleWeeks.redshirt++;
+
             const gap = player.potential - player.overall;
             if (gap > 0) {
-                const progressionChance = 0.15 + ((coachDev / 30) * 0.20) + (gap * 0.005); 
+                // Weekly growth scales with role: actives play, practice squad
+                // trains, redshirts develop — mirroring the offseason ratios.
+                // Gap coefficient is generous: high-ceiling players close on
+                // their potential instead of stalling halfway.
+                const roleFactor = player.status === 'Active Roster' ? 1.0
+                    : player.status === 'Practice Squad' ? 0.5 : 0.33;
+                const progressionChance = (0.15 + ((coachDev / 30) * 0.20) + (gap * 0.010)) * roleFactor;
                 if (Math.random() < progressionChance) {
                     const statKeys = Object.keys(player.stats);
-                    const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                    const focusPool = focusStatPool(gameState.trainingFocus, statKeys);
+                    const randomStat = (focusPool.length > 0 && Math.random() < 0.6)
+                        ? focusPool[Math.floor(Math.random() * focusPool.length)]
+                        : statKeys[Math.floor(Math.random() * statKeys.length)];
                     if (player.stats[randomStat] < 99) {
                         player.stats[randomStat]++;
                         let statTotal = 0;
@@ -469,8 +751,145 @@ export function simulateWeek(gameState) {
     return true;
 }
 
+// Which role a player actually filled most of the season, based on tracked
+// weekly status. A 44-game starter who finishes the year hurt on the practice
+// squad still counts as active — the offseason shouldn't punish the last week.
+// Falls back to current status when nothing was tracked (AI teams, legacy saves).
+export function majorityRole(player) {
+    const rw = player.roleWeeks || { active: 0, practice: 0, redshirt: 0 };
+    const a = rw.active || 0, p = rw.practice || 0, r = rw.redshirt || 0;
+    if (a + p + r === 0) return player.status || 'Active Roster';
+    if (r >= a && r >= p) return 'Redshirt';
+    if (p > a) return 'Practice Squad';
+    return 'Active Roster';
+}
+
+// End-of-season player awards. Computes winners, applies +1 OVR each
+// (capped at 99), and stores the list for the season recap screen.
+// Idempotent — safe to call from the recap render.
+export function computeSeasonAwards(gameState) {
+    if (gameState.seasonAwards) return gameState.seasonAwards;
+    const awards = [];
+    const give = (player, team, type, label) => {
+        player.overall = Math.min(99, (player.overall || 0) + 1);
+        const isGoalie = type === 'all-american' && label.includes('(G)');
+        const sa = player.seasonShotsAgainst || 0;
+        const savePct = sa > 0 ? ((player.seasonSaves || 0) / sa * 100).toFixed(1) + '%' : '—';
+        awards.push({
+            type, label,
+            name: `${player.firstName} ${player.lastName}`,
+            team: team.name,
+            position: player.position,
+            overall: player.overall,
+            points: (player.seasonGoals || 0) + (player.seasonAssists || 0),
+            stat: isGoalie ? `${savePct} SV%` : `${(player.seasonGoals || 0) + (player.seasonAssists || 0)} pts`,
+        });
+    };
+
+    const forwards = [];
+    const defensemen = [];
+    const goalies = [];
+    gameState.leagueTeams.forEach(team => {
+        team.roster.forwards.forEach(p =>
+            forwards.push({ p, team, pts: (p.seasonGoals || 0) + (p.seasonAssists || 0) }));
+        team.roster.defensemen.forEach(p =>
+            defensemen.push({ p, team, pts: (p.seasonGoals || 0) + (p.seasonAssists || 0) }));
+        team.roster.goalies.forEach(p => goalies.push({ p, team }));
+    });
+
+    // All-Americans by position: 6 forwards, 4 defensemen (by points within
+    // position — defenders would never make it on raw points alone),
+    // 2 goalies by save% (min 200 shots against, to avoid small-sample flukes).
+    forwards.sort((a, b) => b.pts - a.pts).slice(0, 6)
+        .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American'));
+    defensemen.sort((a, b) => b.pts - a.pts).slice(0, 4)
+        .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American'));
+    const goalieSavePct = g => {
+        const sa = g.p.seasonShotsAgainst || 0;
+        return sa >= 200 ? (g.p.seasonSaves || 0) / sa : -1;
+    };
+    goalies.sort((a, b) => goalieSavePct(b) - goalieSavePct(a)).slice(0, 2)
+        .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American (G)'));
+
+    // Per-conference: Player of the Year and Rookie of the Year by points.
+    const skaters = forwards.concat(defensemen);
+    const confIds = [...new Set(gameState.leagueTeams.map(t => t.confId))];
+    confIds.forEach(confId => {
+        const conf = skaters.filter(s => s.team.confId === confId);
+        if (!conf.length) return;
+        const poy = [...conf].sort((a, b) => b.pts - a.pts)[0];
+        give(poy.p, poy.team, 'poy', 'Conference Player of the Year');
+        const rookies = conf.filter(s => s.p.year === 'Fr');
+        if (rookies.length) {
+            const roy = [...rookies].sort((a, b) => b.pts - a.pts)[0];
+            give(roy.p, roy.team, 'roy', 'Conference Rookie of the Year');
+        }
+    });
+
+    gameState.seasonAwards = awards;
+    return awards;
+}
+
+// Coach of the Year: best conference record per conference (lower prestige
+// wins ties — did more with less), national champ's coach wins nationally.
+// Returns [{ confId|null, teamName, coachName, type }]. The +1 skill point
+// is applied via the season recap UI (user picks the skill).
+export function computeCoachAwards(gameState) {
+    if (gameState.seasonCoachAwards) return gameState.seasonCoachAwards;
+    const awards = [];
+    const confIds = [...new Set(gameState.leagueTeams.map(t => t.confId))];
+    confIds.forEach(confId => {
+        const teams = gameState.leagueTeams.filter(t => t.confId === confId);
+        const sorted = [...teams].sort((a, b) => {
+            const aw = (a.confWins || 0) * 2 + (a.confOtl || 0);
+            const bw = (b.confWins || 0) * 2 + (b.confOtl || 0);
+            if (bw !== aw) return bw - aw;
+            return a.prestige - b.prestige; // did more with less
+        });
+        const winner = sorted[0];
+        if (winner) awards.push({
+            type: 'coty-conf', label: 'Conference Coach of the Year',
+            confId, teamName: winner.name,
+            isUser: winner.id === gameState.teamId,
+        });
+    });
+    // National: the champion's coach (final game of the schedule).
+    const champGame = (gameState.schedule[44] || [])[0];
+    if (champGame && champGame.homeScore !== null) {
+        const champId = champGame.homeScore > champGame.awayScore ? champGame.homeTeamId : champGame.awayTeamId;
+        const champ = gameState.leagueTeams.find(t => t.id === champId);
+        if (champ) awards.push({
+            type: 'coty-nat', label: 'National Coach of the Year',
+            confId: null, teamName: champ.name,
+            isUser: champ.id === gameState.teamId,
+        });
+    }
+    gameState.seasonCoachAwards = awards;
+    return awards;
+}
+
 export function processOffSeason(gameState) {
     const coachDev = gameState.coach.skills.development || 5;
+
+    // Early NHL draft declarations: juniors/seniors only. Probability scales
+    // with OVR — a 76 is ~4%, an 85 ~40%, capped at 60% (never guaranteed).
+    // Hits AI contenders too, so the rich get churned.
+    const declared = [];
+    gameState.leagueTeams.forEach(team => {
+        ['forwards', 'defensemen', 'goalies'].forEach(key => {
+            team.roster[key] = team.roster[key].filter(p => {
+                if ((p.year === 'Jr' || p.year === 'Sr') && p.injuryWeeks === 0) {
+                    const prob = Math.min(0.6, Math.max(0, ((p.overall || 0) - 75) * 0.04));
+                    if (Math.random() < prob) {
+                        declared.push({ name: `${p.firstName} ${p.lastName}`, team: team.name, overall: p.overall, year: p.year });
+                        return false;
+                    }
+                }
+                return true;
+            });
+        });
+    });
+    if (declared.length) gameState.draftDeclarations = declared;
 
     gameState.leagueTeams.forEach(team => {
         team.roster.forwards = team.roster.forwards.filter(p => p.year !== 'Sr');
@@ -480,22 +899,38 @@ export function processOffSeason(gameState) {
         const allReturning = [...team.roster.forwards, ...team.roster.defensemen, ...team.roster.goalies];
 
         allReturning.forEach(player => {
+            player.seasonGoals = 0;
+            player.seasonAssists = 0;
+            player.seasonSaves = 0;
+            player.seasonShotsAgainst = 0;
+            // Offseason math keys off the role the player actually filled most
+            // of the season — not whatever their status happens to be this week.
+            const seasonRole = majorityRole(player);
+            player.roleWeeks = { active: 0, practice: 0, redshirt: 0 };
+            const gap = Math.max(0, (player.potential || 0) - (player.overall || 0));
             let boostChance = 0;
-            if (player.status === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
-            else if (player.status === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
-            else if (player.status === 'Redshirt') {
+            if (seasonRole === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
+            else if (seasonRole === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
+            else if (seasonRole === 'Redshirt') {
                 boostChance = 0.20 + (coachDev * 0.01);
                 player.redshirtUsed = true; 
             }
+            // Higher-ceiling players develop faster in the offseason too —
+            // same gap mechanic as weekly progression.
+            boostChance = Math.min(0.95, boostChance + gap * 0.015);
 
             if (Math.random() < boostChance) {
                 const statKeys = Object.keys(player.stats);
-                statKeys.forEach(stat => {
-                    if (Math.random() < 0.50 && player.stats[stat] < 99) {
-                        player.stats[stat] += Math.floor(Math.random() * 3) + 1;
-                    }
-                });
-                
+                // Close a fraction of the remaining gap: high-ceiling players
+                // make big jumps, low-ceiling players get a nudge. Self-limiting
+                // — you approach potential but never overshoot it.
+                const ovrGain = (player.potential - player.overall) * 0.25;
+                let pointsToDistribute = Math.max(1, Math.round(ovrGain * statKeys.length));
+                let guard = 0;
+                while (pointsToDistribute > 0 && guard++ < 500) {
+                    const stat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                    if (player.stats[stat] < 99) { player.stats[stat]++; pointsToDistribute--; }
+                }
                 let statTotal = 0;
                 for (let key in player.stats) {
                     statTotal += player.stats[key];
@@ -503,7 +938,27 @@ export function processOffSeason(gameState) {
                 player.overall = Math.round(statTotal / statKeys.length);
             }
 
-            if (player.status !== 'Redshirt') {
+            // Breakout: high-ceiling players sometimes explode — closing 35%
+            // of the gap in one offseason instead of 18%.
+            const breakoutChance = seasonRole === 'Active Roster' ? 0.10
+                : seasonRole === 'Practice Squad' ? 0.05 : 0;
+            if (gap >= 15 && Math.random() < breakoutChance) {
+                const statKeys = Object.keys(player.stats);
+                const ovrGain = (player.potential - player.overall) * 0.45;
+                let pointsToDistribute = Math.max(1, Math.round(ovrGain * statKeys.length));
+                let guard = 0;
+                while (pointsToDistribute > 0 && guard++ < 500) {
+                    const stat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                    if (player.stats[stat] < 99) { player.stats[stat]++; pointsToDistribute--; }
+                }
+                let statTotal = 0;
+                for (let key in player.stats) {
+                    statTotal += player.stats[key];
+                }
+                player.overall = Math.round(statTotal / statKeys.length);
+            }
+
+            if (seasonRole !== 'Redshirt') {
                 if (player.year === 'Jr') player.year = 'Sr';
                 if (player.year === 'So') player.year = 'Jr';
                 if (player.year === 'Fr') player.year = 'So';
@@ -517,4 +972,47 @@ export function processOffSeason(gameState) {
     });
 
     return true;
+}
+
+// --- LEAGUE RANKING HELPERS ---
+
+// Pseudo-poll score balancing points, win percentage, loss penalties, prestige,
+// and strength of schedule (average opponent win%).
+export function pollScore(t, leagueTeams = null, schedule = null) {
+    const w = t.wins || 0;
+    const l = t.losses || 0;
+    const otl = t.otl || 0;
+    const pts = (w * 2) + otl;
+    const gp = w + l + otl;
+    const winPct = gp > 0 ? pts / (gp * 2) : 0;
+    const sos = (leagueTeams && schedule) ? calcSOS(t, leagueTeams, schedule) : 0.5;
+    return (pts * 12) + (winPct * 50) + (t.prestige * 0.5) - (l * 2) + (sos * 50);
+}
+
+// Average win% of a team's scheduled opponents (uses record, not pollScore,
+// to avoid circularity). Neutral 0.5 when no schedule data.
+function calcSOS(t, leagueTeams, schedule) {
+    const oppIds = new Set();
+    for (const week of schedule || []) {
+        for (const g of week) {
+            if (g.homeTeamId === t.id) oppIds.add(g.awayTeamId);
+            else if (g.awayTeamId === t.id) oppIds.add(g.homeTeamId);
+        }
+    }
+    if (!oppIds.size) return 0.5;
+    let sum = 0;
+    for (const id of oppIds) {
+        const o = leagueTeams.find(x => x.id === id);
+        if (!o) continue;
+        const gw = (o.wins || 0) + (o.losses || 0) + (o.otl || 0);
+        sum += gw ? (((o.wins || 0) * 2 + (o.otl || 0)) / (gw * 2)) : 0.5;
+    }
+    return sum / oppIds.size;
+}
+
+// National rank 1-25, or 99 when unranked.
+export function nationalRank(leagueTeams, teamId, schedule = null) {
+    const sorted = [...leagueTeams].sort((a, b) => pollScore(b, leagueTeams, schedule) - pollScore(a, leagueTeams, schedule));
+    const idx = sorted.findIndex(t => t.id === teamId);
+    return idx >= 0 && idx < 25 ? idx + 1 : 99;
 }

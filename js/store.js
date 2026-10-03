@@ -1,0 +1,266 @@
+// store.js — central game state store.
+//
+// Single source of truth for the whole app. Screens read state via getState()
+// (or the getUserTeam() helper) and mutate it via update(), which autosaves.
+// The roster lives ONLY on the team object inside leagueTeams — there is no
+// separate state.roster duplicate.
+
+const SAVE_KEY = 'college_hockey_dynasty_save'; // legacy single slot (migrated)
+const SLOT_KEY = (n) => `college_hockey_dynasty_save_${n}`;
+const ACTIVE_SLOT_KEY = 'college_hockey_dynasty_active_slot';
+const SAVE_VERSION = 1;
+export const SAVE_SLOTS = [1, 2, 3];
+
+let state = null;
+let activeSlot = 1;
+const listeners = new Set();
+
+// One-time migration: legacy single-slot save becomes slot 1.
+function migrateLegacySlot() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (raw && !localStorage.getItem(SLOT_KEY(1))) {
+            localStorage.setItem(SLOT_KEY(1), raw);
+        }
+        if (raw) localStorage.removeItem(SAVE_KEY);
+    } catch (e) { /* ignore */ }
+    try {
+        const a = parseInt(localStorage.getItem(ACTIVE_SLOT_KEY), 10);
+        if (a >= 1 && a <= 3) activeSlot = a;
+    } catch (e) { /* ignore */ }
+}
+migrateLegacySlot();
+
+export function getActiveSlot() { return activeSlot; }
+export function setActiveSlot(n) {
+    if (n >= 1 && n <= 3) {
+        activeSlot = n;
+        try { localStorage.setItem(ACTIVE_SLOT_KEY, String(n)); } catch (e) { /* ignore */ }
+    }
+}
+
+export function getState() {
+    return state;
+}
+
+// Replace the entire state (e.g. new career, loaded game).
+export function setState(newState, { save = true } = {}) {
+    state = newState;
+    if (save) persist();
+    emit();
+}
+
+// Mutate the state, then autosave + notify subscribers.
+export function update(mutator) {
+    if (!state) throw new Error('store.update: no state loaded');
+    mutator(state);
+    persist();
+    emit();
+}
+
+export function subscribe(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+}
+
+function emit() {
+    listeners.forEach(fn => {
+        try { fn(state); } catch (e) { console.error('store listener failed:', e); }
+    });
+}
+
+// The user's team object. Roster lives only here.
+export function getUserTeam() {
+    if (!state || !state.teamId) return null;
+    return state.leagueTeams.find(t => t.id === state.teamId) || null;
+}
+
+export function newCareerState() {
+    return {
+        coach: {
+            firstName: '', lastName: '', age: 35, skills: {}, history: [],
+            prestige: 15, xp: 0, level: 1, unspentPoints: 0, missStreak: 0
+        },
+        teamId: null,
+        year: 2026,
+        currentWeek: 1,
+        trainingFocus: 'balanced',
+        leagueTeams: [],
+        schedule: [],
+        prospectPool: [],
+        recruitTargets: [],
+        recruitWeekAlloc: {}
+    };
+}
+
+export function hasSave(slot = activeSlot) {
+    try {
+        return localStorage.getItem(SLOT_KEY(slot)) !== null;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Preview info for a slot (menu display). Null when empty/unreadable.
+export function getSlotInfo(slot) {
+    let raw = null;
+    try { raw = localStorage.getItem(SLOT_KEY(slot)); } catch (e) { return null; }
+    if (!raw) return null;
+    try {
+        const data = JSON.parse(raw);
+        const s = data && data.state ? data.state : data;
+        const coach = s.coach || {};
+        const team = (s.leagueTeams || []).find(t => t.id === s.teamId);
+        return {
+            coachName: `${coach.firstName || ''} ${coach.lastName || ''}`.trim() || 'Unnamed Coach',
+            teamName: team ? team.name : '—',
+            year: s.year || 2026,
+            week: s.currentWeek || 1,
+            savedAt: data.savedAt || null
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+export function persist(slot = activeSlot) {
+    if (!state) return false;
+    try {
+        const payload = { version: SAVE_VERSION, savedAt: new Date().toISOString(), state };
+        localStorage.setItem(SLOT_KEY(slot), JSON.stringify(payload));
+        return true;
+    } catch (e) {
+        console.error('store.persist: save failed:', e);
+        return false;
+    }
+}
+
+// Best-effort load. Returns the state, or null when nothing usable is saved.
+export function loadSaved(slot = activeSlot) {
+    let raw = null;
+    try {
+        raw = localStorage.getItem(SLOT_KEY(slot));
+    } catch (e) {
+        console.error('store.loadSaved: read failed:', e);
+        return null;
+    }
+    if (!raw) return null;
+    try {
+        const data = JSON.parse(raw);
+        // v0 saves were the bare gameState object, not the versioned wrapper.
+        const savedState = data && data.state ? data.state : data;
+        state = migrate(savedState, data && data.version ? data.version : 0);
+        setActiveSlot(slot);
+        emit();
+        return state;
+    } catch (e) {
+        console.error('store.loadSaved: parse failed:', e);
+        return null;
+    }
+}
+
+export function clearSave(slot = activeSlot) {
+    try { localStorage.removeItem(SLOT_KEY(slot)); } catch (e) { /* ignore */ }
+    if (slot === activeSlot) {
+        state = null;
+        emit();
+    }
+}
+
+// Bring older saves up to the current shape.
+function migrate(s, version) {
+    if (!s || typeof s !== 'object') return newCareerState();
+    if (!Array.isArray(s.leagueTeams)) s.leagueTeams = [];
+    if (!Array.isArray(s.schedule)) s.schedule = [];
+    if (!s.coach) s.coach = { firstName: '', lastName: '', age: 35, skills: {}, history: [] };
+    s.coach.prestige = s.coach.prestige ?? 15;
+    s.coach.xp = s.coach.xp ?? 0;
+    s.coach.level = s.coach.level ?? 1;
+    s.coach.unspentPoints = s.coach.unspentPoints ?? 0;
+    s.coach.missStreak = s.coach.missStreak ?? 0;
+    if (!s.trainingFocus) s.trainingFocus = 'balanced';
+    // Pre-rebuild saves duplicated the roster at the top level; the team
+    // object inside leagueTeams is the canonical copy now.
+    if (s.roster) delete s.roster;
+    if (typeof s.currentWeek !== 'number') s.currentWeek = 1;
+    if (typeof s.year !== 'number') s.year = 2026;
+    if (!Array.isArray(s.prospectPool)) s.prospectPool = [];
+    if (!Array.isArray(s.recruitTargets)) s.recruitTargets = [];
+    // Forwards get a natural line position and home line slot (auto-formed
+    // for existing rosters that predate the lines system).
+    s.leagueTeams.forEach(team => {
+        if (!team.roster || !Array.isArray(team.roster.forwards)) return;
+        let needsForm = false;
+        team.roster.forwards.forEach(p => {
+            if (!p.linePos) p.linePos = ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)];
+            if (!p.lineSlot) needsForm = true;
+        });
+        if (needsForm) {
+            // Only auto-form the active dozen; reserves keep no slot.
+            const active = team.roster.forwards
+                .filter(p => p.status === 'Active Roster' && !p.injuryWeeks)
+                .sort((a, b) => (b.overall || 0) - (a.overall || 0));
+            // Reuse the lines module via dynamic import guard (store can't
+            // statically import engine's line helpers without a cycle).
+            const slots = [];
+            for (let l = 1; l <= 4; l++) for (const pos of ['C', 'LW', 'RW']) slots.push(`L${l}${pos}`);
+            const byPos = { C: [], LW: [], RW: [] };
+            active.forEach(p => byPos[p.linePos].push(p));
+            slots.forEach(slot => {
+                const pos = slot.slice(2);
+                const p = byPos[pos].shift();
+                if (p) p.lineSlot = slot;
+            });
+        }
+    });
+    if (!s.recruitWeekAlloc || typeof s.recruitWeekAlloc !== 'object') s.recruitWeekAlloc = {};
+    return s;
+}
+
+export function exportSave(slot = activeSlot) {
+    let raw = null;
+    try { raw = localStorage.getItem(SLOT_KEY(slot)); } catch (e) { /* ignore */ }
+    if (!raw) return false;
+    const blob = new Blob([raw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dynasty_save_slot${slot}_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return true;
+}
+
+// Reads a user-picked .json file into a save slot. Resolves true on success.
+export function importSaveFile(file, slot = activeSlot) {
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                const savedState = data && data.state ? data.state : data;
+                const migrated = migrate(savedState, data && data.version ? data.version : 0);
+                try {
+                    localStorage.setItem(SLOT_KEY(slot), JSON.stringify({
+                        version: SAVE_VERSION,
+                        savedAt: new Date().toISOString(),
+                        state: migrated
+                    }));
+                } catch (err) {
+                    console.error('store.importSaveFile: save failed:', err);
+                    resolve(false);
+                    return;
+                }
+                state = migrated;
+                setActiveSlot(slot);
+                emit();
+                resolve(true);
+            } catch (err) {
+                console.error('store.importSaveFile: parse failed:', err);
+                resolve(false);
+            }
+        };
+        reader.onerror = () => resolve(false);
+        reader.readAsText(file);
+    });
+}

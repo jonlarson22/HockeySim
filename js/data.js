@@ -55,19 +55,77 @@ export const teams = [
 // 3. Name Generation Arrays
 // A mix of traditional North American and common hockey-centric names.
 export const firstNames = [
-  "Liam", "Noah", "Oliver", "Elijah", "James", "William", "Benjamin", "Lucas", "Henry", "Theodore",
-  "Jack", "Levi", "Alexander", "Jackson", "Mateo", "Daniel", "Michael", "Mason", "Sebastian", "Ethan",
-  "Logan", "Owen", "Samuel", "Jacob", "Asher", "Aiden", "John", "Joseph", "Wyatt", "David",
-  "Connor", "Cole", "Dylan", "Elias", "Lars", "Sven", "Declan", "Gavin", "Carter", "Nolan"
+  // North American
+  "Liam", "Noah", "Jack", "Connor", "Cole", "Dylan", "Logan", "Owen", "Mason", "Carter",
+  "Nolan", "Brady", "Colton", "Dawson", "Tyler", "Ryan", "Kyle", "Jake", "Luke", "Ethan",
+  "Oliver", "James", "William", "Benjamin", "Lucas", "Henry", "Alexander", "Jackson", "Daniel", "Michael",
+  "Samuel", "Jacob", "John", "Joseph", "Wyatt", "David", "Declan", "Gavin", "Asher", "Aiden",
+  // Swedish
+  "Elias", "Lars", "Sven", "Hugo", "Filip", "Viktor", "Anton", "Emil", "Oskar", "Nils",
+  "Sebastian", "Theodore", "Levi", "Mateo",
+  // Finnish
+  "Mikko", "Aleksi", "Ville", "Jussi", "Pekka", "Teemu", "Saku", "Eero", "Onni", "Antti",
+  "Juhani", "Lasse", "Olli", "Petri",
+  // Russian
+  "Dmitri", "Ivan", "Nikolai", "Sergei", "Pavel", "Andrei", "Evgeni", "Nikita", "Artem", "Maxim",
+  "Igor", "Vladimir", "Alexei", "Kirill",
+  // Czech / Slovak
+  "Jakub", "Tomas", "Martin", "Petr", "Jan", "Lukas", "Ondrej", "Marek", "Zdeno", "Radek",
+  "Juraj", "Matej",
+  // Extra
+  "Elijah", "Nathan", "Aaron", "Joel", "Simon", "Caleb",
+  // Famous first names (non-weighted — the connection is harder to spot)
+  "Wayne", "Gordie", "Alex", "Sidney", "Mike", "Chris", "Mario", "Bobby",
+  "Mark", "Steve", "Joe", "Peter", "Nicklas", "Dominik", "Jaromir", "Brett",
+  "Maurice", "Jean", "Guy", "Bryan", "Denis", "Phil", "Eric",
+  // Hart winners' first names
+  "Jose", "Henrik", "Corey", "Carey", "Patrick", "Taylor", "Leon", "Auston",
 ];
 
 export const lastNames = [
-  "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
-  "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
-  "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
-  "Roy", "Bouchard", "Tkachuk", "Hughes", "Weber", "Price", "Bergeron", "Lindholm", "Karlsson", "Gallagher",
-  "O'Connor", "MacDonald", "Tremblay", "Gagnon", "Pelletier", "Lavoie", "St-Jean", "Couture", "Morin"
+  // Canadian (English)
+  "Smith", "Brown", "Wilson", "Taylor", "Moore", "Clark", "Lewis", "Walker", "Carney", "Young",
+  "King", "Wright", "Scott", "Green", "Baker", "Adams", "Nelson", "Carter", "Mitchell", "Turner",
+  // Canadian (French)
+  "Roy", "Bouchard", "Tremblay", "Gagnon", "Pelletier", "Lavoie", "Couture", "Morin", "Bergeron", "Gallagher",
+  "Lindholm", "St-Jean", "O'Connor", "MacDonald",
+  // American
+  "Johnson", "Williams", "Jones", "Miller", "Davis", "Thomas", "Jackson", "White", "Harris", "Martin",
+  "Thompson", "Robinson", "Lee", "Fisher",
+  // Swedish
+  "Karlsson", "Andersson", "Johansson", "Nilsson", "Eriksson", "Larsson", "Olsson", "Persson", "Svensson", "Gustafsson",
+  "Pettersson", "Jonsson", "Lundqvist", "Hedman",
+  // Finnish
+  "Korhonen", "Virtanen", "Makinen", "Nieminen", "Laine", "Rantanen", "Aho", "Barkov", "Heiskanen", "Rinne",
+  // Russian
+  "Ivanov", "Petrov", "Kuznetsov", "Popov", "Sokolov", "Mikhailov", "Tarasov", "Orlov", "Volkov", "Semenov",
+  // Czech / Slovak
+  "Novak", "Svoboda", "Dvorak", "Prochazka", "Krejci", "Hertl", "Pastrnak", "Chara", "Hossa", "Gaborik",
+  // Swiss / German
+  "Weber", "Muller", "Schmid", "Keller", "Fiala", "Hischier", "Stutzle",
+  // North American (evening out the pools)
+  "Campbell", "Fraser", "McKenzie", "Sullivan", "Murphy", "Kelly", "Ryan", "Burns",
+  "Kennedy", "Ferguson", "Patterson", "Graham", "Duncan", "Boyd", "Crawford", "Bishop",
+  "Fowler", "Hamilton", "Schultz", "McLeod", "Callahan", "Delaney", "Flynn", "Grady",
+  "Hogan", "Keating", "Lynch", "Malone", "Nugent", "O'Brien", "Quinn", "Reilly",
+  // Famous hockey bloodlines (is he related?)
+  "Gretzky", "Howe", "Ovechkin", "Crosby", "Modano", "Chelios", "Zubov", "Lemieux",
+  "Orr", "Messier", "Yzerman", "Sakic", "Forsberg", "Lidstrom", "Brodeur", "Hasek",
+  "Jagr", "Fedorov", "Bure", "Hull",
 ];
+
+export const regularLastNames = lastNames.slice(0, 131);
+export const famousLastNames = lastNames.slice(131);
+
+// Second wave of bloodlines (30 total at the same 4% weight — each one rarer).
+famousLastNames.push(
+  "Richard", "Beliveau", "Lafleur", "Bossy", "Trottier",
+  "Potvin", "Esposito", "Selanne", "Lindros", "McDavid",
+  // Hart Trophy winners 1990-2025 not already listed
+  "Pronger", "Theodore", "St. Louis", "Thornton", "Sedin",
+  "Perry", "Malkin", "Price", "Kane", "Hall",
+  "Kucherov", "Draisaitl", "Matthews", "MacKinnon", "Hellebuyck"
+);
 
 // 4. Helper Function: Generate a Random Player Name
 export function getRandomFirstName() {
@@ -75,5 +133,7 @@ export function getRandomFirstName() {
 }
 
 export function getRandomLastName() {
-    return lastNames[Math.floor(Math.random() * lastNames.length)];
+    // Famous bloodlines are rare: 4% of players (~1 per team).
+    if (Math.random() < 0.04) return famousLastNames[Math.floor(Math.random() * famousLastNames.length)];
+    return regularLastNames[Math.floor(Math.random() * regularLastNames.length)];
 }

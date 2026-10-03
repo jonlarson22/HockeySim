@@ -18,6 +18,8 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
     border-bottom: 1px solid #333;
     padding-bottom: 15px;
     margin-bottom: 25px;
@@ -249,6 +251,14 @@ li {
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
+    .dash-col {
+        min-width: 0;
+    }
+    .standings-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
 }
 
 /* Make recap and bracket screens wider */
@@ -286,4 +296,52 @@ li {
     text-align: right;
     min-width: 40px;
     font-weight: bold;
+}
+
+/* --- Modal (rendered into #modal-root by ui.js) --- */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 10vh;
+}
+
+.modal-card {
+    background: #1e1e1e;
+    padding: 20px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    max-width: 500px;
+    width: calc(100% - 40px);
+}
+
+.modal-card ul {
+    margin-top: 10px;
+}
+
+.modal-card li {
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 6px 10px;
+}
+
+/* --- Game-day event ticker --- */
+.event-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: #222;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    animation: fadeSlideIn 0.45s ease both;
+}
+
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
 }
