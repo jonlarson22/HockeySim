@@ -43,7 +43,7 @@ function focusStatPool(focus, statKeys) {
 // NEW: Initialize the league with randomized prestige and zeroed records
 export function initializeLeague(baseTeams) {
     return baseTeams.map(team => {
-        const variance = Math.floor(Math.random() * 9) - 4; 
+        const variance = Math.floor(Math.random() * 7) - 3; // +/-3 starting prestige
         let newPrestige = team.prestige + variance;
         
         if (newPrestige > 99) newPrestige = 99;
