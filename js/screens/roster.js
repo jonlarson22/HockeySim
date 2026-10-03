@@ -15,7 +15,16 @@ function findPlayer(team, playerId) {
 
 function openPlayerModal(player) {
     const g = player.seasonGoals || 0, a = player.seasonAssists || 0;
-    const seasonHTML = `<p style="margin-top:0;"><strong>Season:</strong> <span style="color:#4ade80;">${g}G ${a}A ${g + a}P</span></p>`;
+    const pim = player.seasonPIM || 0, pm = player.seasonPlusMinus || 0, ppg = player.seasonPPG || 0;
+    const pmStr = (pm >= 0 ? '+' : '') + pm;
+    let seasonHTML;
+    if (player.position === 'G') {
+        const w = player.seasonWins || 0, l = player.seasonLosses || 0, so = player.seasonShutouts || 0;
+        const svpct = player.seasonShotsAgainst ? (player.seasonSaves / player.seasonShotsAgainst * 100).toFixed(1) + '%' : '—';
+        seasonHTML = `<p style="margin-top:0;"><strong>Season:</strong> <span style="color:#4ade80;">${w}W-${l}L, ${so}SO, ${svpct} SV%</span></p>`;
+    } else {
+        seasonHTML = `<p style="margin-top:0;"><strong>Season:</strong> <span style="color:#4ade80;">${g}G ${a}A ${g + a}P, ${pmStr}, ${pim} PIM (${ppg} PPG)</span></p>`;
+    }
     const statsHTML = '<ul>' + Object.entries(player.stats)
         .map(([stat, val]) => `<li><strong>${esc(stat.toUpperCase())}:</strong> ${val}</li>`)
         .join('') + '</ul>';
@@ -70,7 +79,9 @@ export function render(container) {
                         <span style="background:#1e3a8a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-right:10px;border:1px solid #3b82f6;">POT: ${p.potential}</span>
                         ${injuryTag}
                         ${esc(p.firstName)} ${esc(p.lastName)} <span style="color:#aaa;font-size:0.9em;margin-left:5px;">(${p.year})</span>${posTag}
-                        <span style="color:#4ade80;font-size:0.85em;margin-left:8px;white-space:nowrap;" title="Season goals / assists / points">${p.seasonGoals || 0}G ${p.seasonAssists || 0}A ${(p.seasonGoals || 0) + (p.seasonAssists || 0)}P</span>
+                        <span style="color:#4ade80;font-size:0.85em;margin-left:8px;white-space:nowrap;" title="Season stats">${p.position === 'G'
+                            ? `${p.seasonWins || 0}W ${p.seasonLosses || 0}L ${p.seasonShutouts || 0}SO`
+                            : `${p.seasonGoals || 0}G ${p.seasonAssists || 0}A ${(p.seasonGoals || 0) + (p.seasonAssists || 0)}P ${((p.seasonPlusMinus || 0) >= 0 ? '+' : '') + (p.seasonPlusMinus || 0)} ${p.seasonPIM || 0}PIM`}</span>
                     </a>
                     <select class="role-select" data-id="${p.id}" ${lockAttr} style="${(pastWeek10 && isRedshirt) ? 'background:#444;cursor:not-allowed;' : ''}">
                         <option value="Active Roster" ${p.status === 'Active Roster' ? 'selected' : ''}>Active Roster</option>

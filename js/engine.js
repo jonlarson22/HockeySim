@@ -1,5 +1,5 @@
 import { getRandomFirstName, getRandomLastName } from './data.js';
-import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr } from './lines.js';
+import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole } from './lines.js';
 
 import { 
     generateConferenceQuarterfinals, 
@@ -431,7 +431,10 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
             scorer: `${scorer.firstName} ${scorer.lastName}`,
             scorerId: scorer.id,
             assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`),
-            assistIds: [a1, a2].filter(Boolean).map(a => a.id)
+            assistIds: [a1, a2].filter(Boolean).map(a => a.id),
+            // ~25% of regulation goals come on the power play. Pure label —
+            // the final score was drawn before this runs. No PP in OT (3v3).
+            isPP: period < 4 && Math.random() < 0.25
         });
     };
 
@@ -484,10 +487,43 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         if (!e.scorerId || e.scorerId === 'none') continue;
         const team = e.teamId === homeTeam.id ? homeTeam : awayTeam;
         const scorer = find(team, e.scorerId);
-        if (scorer) scorer.seasonGoals = (scorer.seasonGoals || 0) + 1;
+        if (scorer) {
+            scorer.seasonGoals = (scorer.seasonGoals || 0) + 1;
+            if (e.isPP) scorer.seasonPPG = (scorer.seasonPPG || 0) + 1;
+        }
         for (const aid of e.assistIds || []) {
             const a = find(team, aid);
             if (a) a.seasonAssists = (a.seasonAssists || 0) + 1;
+        }
+    }
+
+    const activeSkaters = (team) => [
+        ...team.roster.forwards.filter(p => p.status === 'Active Roster' && !p.injuryWeeks),
+        ...team.roster.defensemen.filter(p => p.status === 'Active Roster' && !p.injuryWeeks)
+    ];
+
+    // Plus/minus: even-strength goals only (real hockey skips +/- on power plays).
+    for (const e of events) {
+        if (!e.scorerId || e.scorerId === 'none' || e.isPP) continue;
+        const scored = e.teamId === homeTeam.id ? homeTeam : awayTeam;
+        const conceded = scored === homeTeam ? awayTeam : homeTeam;
+        for (const p of activeSkaters(scored)) p.seasonPlusMinus = (p.seasonPlusMinus || 0) + 1;
+        for (const p of activeSkaters(conceded)) p.seasonPlusMinus = (p.seasonPlusMinus || 0) - 1;
+    }
+
+    // Penalties: 3-7 minors per team per game, Power Forwards take more.
+    // Pure annotation — does not affect the final score.
+    for (const team of [homeTeam, awayTeam]) {
+        const skaters = activeSkaters(team);
+        if (!skaters.length) continue;
+        const weights = skaters.map(p => getRole(p) === 'Power Forward' ? 2 : 1);
+        const totalW = weights.reduce((a, b) => a + b, 0);
+        for (let i = 0, minors = randomInt(3, 7); i < minors; i++) {
+            let r = Math.random() * totalW;
+            for (let j = 0; j < skaters.length; j++) {
+                r -= weights[j];
+                if (r <= 0) { skaters[j].seasonPIM = (skaters[j].seasonPIM || 0) + 2; break; }
+            }
         }
     }
 
@@ -502,11 +538,17 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         const sa = awayGoals * 7 + randomInt(12, 32);
         homeGoalie.seasonSaves = (homeGoalie.seasonSaves || 0) + Math.max(0, sa - awayGoals);
         homeGoalie.seasonShotsAgainst = (homeGoalie.seasonShotsAgainst || 0) + sa;
+        if (awayGoals === 0) homeGoalie.seasonShutouts = (homeGoalie.seasonShutouts || 0) + 1;
+        if (homeGoals > awayGoals) homeGoalie.seasonWins = (homeGoalie.seasonWins || 0) + 1;
+        else if (awayGoals > homeGoals) homeGoalie.seasonLosses = (homeGoalie.seasonLosses || 0) + 1;
     }
     if (awayGoalie) {
         const sa = homeGoals * 7 + randomInt(12, 32);
         awayGoalie.seasonSaves = (awayGoalie.seasonSaves || 0) + Math.max(0, sa - homeGoals);
         awayGoalie.seasonShotsAgainst = (awayGoalie.seasonShotsAgainst || 0) + sa;
+        if (homeGoals === 0) awayGoalie.seasonShutouts = (awayGoalie.seasonShutouts || 0) + 1;
+        if (awayGoals > homeGoals) awayGoalie.seasonWins = (awayGoalie.seasonWins || 0) + 1;
+        else if (homeGoals > awayGoals) awayGoalie.seasonLosses = (awayGoalie.seasonLosses || 0) + 1;
     }
 }
 
