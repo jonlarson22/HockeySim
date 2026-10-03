@@ -74,6 +74,10 @@ export const firstNames = [
   "Juraj", "Matej",
   // Extra
   "Elijah", "Nathan", "Aaron", "Joel", "Simon", "Caleb",
+  // Famous first names (non-weighted — the connection is harder to spot)
+  "Wayne", "Gordie", "Alex", "Sidney", "Mike", "Chris", "Mario", "Bobby",
+  "Mark", "Steve", "Joe", "Peter", "Nicklas", "Dominik", "Jaromir", "Brett",
+  "Maurice", "Jean", "Guy", "Bryan", "Denis", "Phil", "Eric",
 ];
 
 export const lastNames = [
