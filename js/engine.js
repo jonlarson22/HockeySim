@@ -1,4 +1,4 @@
-import { getRandomFirstName, getRandomLastName } from './data.js';
+import { getRandomFirstName, getRandomLastName, conferences } from './data.js';
 import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole } from './lines.js';
 
 import { 
@@ -996,7 +996,73 @@ export function processOffSeason(gameState) {
         team.prestige = Math.max(1, Math.min(99, p + drift + randomInt(-1, 1)));
     });
 
+    // Conference realignment: strong programs in weak leagues get invited up;
+    // collapsing powers get sent down. Rare (max 2 swaps/year), and a moved
+    // team must prove itself for 4 seasons before moving again. Not soccer —
+    // this is deliberate, not automatic.
+    conferenceRealignment(gameState);
+
     return true;
+}
+
+// Runs once per offseason. Returns a log of moves for the recap screen.
+export function conferenceRealignment(gameState) {
+    const log = [];
+    const confAvg = {};
+    const confTeams = {};
+    gameState.leagueTeams.forEach(t => {
+        (confTeams[t.confId] = confTeams[t.confId] || []).push(t);
+    });
+    Object.keys(confTeams).forEach(cid => {
+        const ts = confTeams[cid];
+        confAvg[cid] = ts.reduce((a, t) => a + (t.prestige || 50), 0) / ts.length;
+    });
+    // Conferences ranked strongest to weakest.
+    const ranked = Object.keys(confTeams).sort((a, b) => confAvg[b] - confAvg[a]);
+
+    let swaps = 0;
+    // Try to move teams up from the bottom half into the top half.
+    for (let i = ranked.length - 1; i >= Math.ceil(ranked.length / 2) && swaps < 2; i--) {
+        const weakId = ranked[i];
+        const weakTeams = confTeams[weakId].filter(t => (t.seasonsInConf ?? 4) >= 4);
+        if (!weakTeams.length) continue;
+        // Best team in the weak conference.
+        const up = [...weakTeams].sort((a, b) => b.prestige - a.prestige)[0];
+        // Find a stronger conference with a clear gap that would take them.
+        for (let j = 0; j < Math.floor(ranked.length / 2) && swaps < 2; j++) {
+            const strongId = ranked[j];
+            if (confAvg[strongId] - confAvg[weakId] < 15) continue;
+            // They need to be a proven power (65+) and competitive up there.
+            if (up.prestige < 65 || up.prestige < confAvg[strongId] - 10) continue;
+            const strongTeams = confTeams[strongId].filter(t => (t.seasonsInConf ?? 4) >= 4 && t.id !== gameState.teamId);
+            if (!strongTeams.length) continue;
+            // The weakest team in the strong conference goes down.
+            const down = [...strongTeams].sort((a, b) => a.prestige - b.prestige)[0];
+            if (down.prestige > confAvg[weakId] + 10) continue;
+            // User's team: invite, don't force. AI teams move automatically.
+            if (up.id === gameState.teamId) {
+                (gameState.realignmentInvites = gameState.realignmentInvites || []).push({
+                    teamId: up.id, fromConf: weakId, toConf: strongId,
+                    downTeamId: down.id, downTeamName: down.name
+                });
+                continue;
+            }
+            const fromName = conferences.find(c => c.id === weakId)?.name || weakId;
+            const toName = conferences.find(c => c.id === strongId)?.name || strongId;
+            up.confId = strongId; up.seasonsInConf = 0;
+            down.confId = weakId; down.seasonsInConf = 0;
+            log.push(`${up.name} invited to the ${toName} (${down.name} relegated to the ${fromName})`);
+            swaps++;
+            // Refresh the groupings after a swap.
+            confTeams[weakId] = confTeams[weakId].filter(t => t.id !== up.id).concat([down]);
+            confTeams[strongId] = confTeams[strongId].filter(t => t.id !== down.id).concat([up]);
+            break;
+        }
+    }
+    // Age everyone's tenure (moved teams go 0 -> 1; everyone else +1).
+    gameState.leagueTeams.forEach(t => { t.seasonsInConf = (t.seasonsInConf ?? 4) + 1; });
+    if (log.length) gameState.realignmentLog = log;
+    return log;
 }
 
 // --- LEAGUE RANKING HELPERS ---
