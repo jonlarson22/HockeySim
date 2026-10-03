@@ -1039,8 +1039,8 @@ export function conferenceRealignment(gameState) {
     const ranked = Object.keys(confTeams).sort((a, b) => confAvg[b] - confAvg[a]);
 
     let swaps = 0;
-    // Try to move teams up from the bottom half into the top half.
-    for (let i = ranked.length - 1; i >= Math.ceil(ranked.length / 2) && swaps < 2; i--) {
+    // Any team that outgrows its league can climb: weakest leagues get first crack.
+    for (let i = ranked.length - 1; i >= 1 && swaps < 2; i--) {
         const weakId = ranked[i];
         const weakTeams = confTeams[weakId].filter(t => (t.seasonsInConf ?? 4) >= 4);
         if (!weakTeams.length) continue;
@@ -1049,7 +1049,7 @@ export function conferenceRealignment(gameState) {
         // Candidate stronger conferences, closest first: a real step up (gap 6+)
         // but no teleport (gap 15 max). Teams climb one rung at a time.
         const targets = [];
-        for (let j = 0; j < Math.floor(ranked.length / 2) && swaps < 2; j++) {
+        for (let j = 0; j < i && swaps < 2; j++) {
             const strongId = ranked[j];
             const gap = confAvg[strongId] - confAvg[weakId];
             if (gap < 6 || gap > 15) continue;
