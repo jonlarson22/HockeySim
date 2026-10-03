@@ -21,6 +21,11 @@ export function render(container) {
         const spent = Object.values(alloc).reduce((a, b) => a + b, 0);
         const pointsLeft = budget - spent;
 
+        // Scouting reveals exact numbers: OVR at 10+, potential at 20+.
+        const scouting = s.coach.skills.scouting || 0;
+        const showOVR = scouting >= 10;
+        const showPOT = scouting >= 20;
+
         const visible = pool.filter(p => {
             if (p.signedBy) return false;
             if (targetsOnly && !p.isUserTarget) return false;
@@ -37,7 +42,7 @@ export function render(container) {
                     <div>
                         <div>${badge}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong> (${p.position})</div>
                         <div style="font-size:0.85em;color:#aaa;margin-top:4px;">
-                            Grade: <strong>${getScoutedGrade(p.overall)}</strong> | Pot: <strong>${esc(getPotentialDescriptor(p.potential))}</strong> | Total Interest: <span style="color:#4ade80;">${interest} pts</span>
+                            Grade: <strong>${showOVR ? p.overall : getScoutedGrade(p.overall)}</strong> | Pot: <strong>${showPOT ? p.potential : getPotentialDescriptor(p.potential)}</strong> | Total Interest: <span style="color:#4ade80;">${interest} pts</span>
                         </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">

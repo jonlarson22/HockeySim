@@ -1,8 +1,8 @@
 // screens/dashboard.js — in-season hub.
-import { getState, getUserTeam } from '../store.js';
+import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
-import { pollScore } from '../engine.js';
+import { pollScore, TRAINING_FOCUSES } from '../engine.js';
 import { conferences } from '../data.js';
 import { esc, scheduleLabel } from '../ui.js';
 
@@ -54,6 +54,12 @@ export function render(container) {
                     <h2>Team Management</h2>
                     <button id="dash-roster" class="primary" style="width: 100%; margin-bottom: 10px;">View Roster</button>
                     <button id="dash-coach" class="secondary" style="width: 100%;">Coach Profile</button>
+                    <div style="margin-top: 10px;">
+                        <label for="dash-focus" style="font-size: 0.9em; color: #aaa;">Training Focus:</label>
+                        <select id="dash-focus" class="input-field" style="margin-top: 5px;">
+                            ${TRAINING_FOCUSES.map(f => `<option value="${f.key}">${esc(f.label)}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
                 <div class="dashboard-panel">
                     <h2>Postseason</h2>
@@ -101,6 +107,10 @@ export function render(container) {
     confSelect.value = team.confId;
     paintStandings(team.confId);
     confSelect.onchange = e => paintStandings(e.target.value);
+
+    const focusSelect = container.querySelector('#dash-focus');
+    focusSelect.value = s.trainingFocus || 'balanced';
+    focusSelect.onchange = e => update(st => { st.trainingFocus = e.target.value; });
 
     container.querySelector('#dash-sim').onclick = () => {
         const { weekIndex, seasonActive } = simCurrentWeek();

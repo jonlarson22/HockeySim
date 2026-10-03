@@ -17,6 +17,27 @@ function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// Training focus groups. 'balanced' (or unset) = no focus.
+const FOCUS_STATS = {
+    offense: ['shooting', 'passing'],
+    defense: ['defense'],
+    physical: ['physicality', 'skating'],
+    goaltending: ['reflexes', 'positioning']
+};
+
+export const TRAINING_FOCUSES = [
+    { key: 'balanced', label: 'Balanced' },
+    { key: 'offense', label: 'Offense (shooting, passing)' },
+    { key: 'defense', label: 'Defense' },
+    { key: 'physical', label: 'Physical (hitting, skating)' },
+    { key: 'goaltending', label: 'Goaltending' }
+];
+
+function focusStatPool(focus, statKeys) {
+    if (!focus || focus === 'balanced' || !FOCUS_STATS[focus]) return [];
+    return statKeys.filter(k => FOCUS_STATS[focus].includes(k));
+}
+
 // NEW: Initialize the league with randomized prestige and zeroed records
 export function initializeLeague(baseTeams) {
     return baseTeams.map(team => {
@@ -521,7 +542,10 @@ export function simulateWeek(gameState) {
                 const progressionChance = 0.15 + ((coachDev / 30) * 0.20) + (gap * 0.005); 
                 if (Math.random() < progressionChance) {
                     const statKeys = Object.keys(player.stats);
-                    const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
+                    const focusPool = focusStatPool(gameState.trainingFocus, statKeys);
+                    const randomStat = (focusPool.length > 0 && Math.random() < 0.6)
+                        ? focusPool[Math.floor(Math.random() * focusPool.length)]
+                        : statKeys[Math.floor(Math.random() * statKeys.length)];
                     if (player.stats[randomStat] < 99) {
                         player.stats[randomStat]++;
                         let statTotal = 0;

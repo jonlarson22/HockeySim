@@ -49,10 +49,14 @@ export function getUserTeam() {
 
 export function newCareerState() {
     return {
-        coach: { firstName: '', lastName: '', age: 35, skills: {}, history: [] },
+        coach: {
+            firstName: '', lastName: '', age: 35, skills: {}, history: [],
+            prestige: 15, xp: 0, level: 1, unspentPoints: 0, missStreak: 0
+        },
         teamId: null,
         year: 2026,
         currentWeek: 1,
+        trainingFocus: 'balanced',
         leagueTeams: [],
         schedule: []
     };
@@ -113,6 +117,12 @@ function migrate(s, version) {
     if (!Array.isArray(s.leagueTeams)) s.leagueTeams = [];
     if (!Array.isArray(s.schedule)) s.schedule = [];
     if (!s.coach) s.coach = { firstName: '', lastName: '', age: 35, skills: {}, history: [] };
+    s.coach.prestige = s.coach.prestige ?? 15;
+    s.coach.xp = s.coach.xp ?? 0;
+    s.coach.level = s.coach.level ?? 1;
+    s.coach.unspentPoints = s.coach.unspentPoints ?? 0;
+    s.coach.missStreak = s.coach.missStreak ?? 0;
+    if (!s.trainingFocus) s.trainingFocus = 'balanced';
     // Pre-rebuild saves duplicated the roster at the top level; the team
     // object inside leagueTeams is the canonical copy now.
     if (s.roster) delete s.roster;
