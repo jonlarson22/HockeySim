@@ -3,7 +3,7 @@
 // log recorded at sim time lets the user watch their game unfold.
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
-import { esc } from '../ui.js';
+import { esc, scheduleLabel } from '../ui.js';
 
 const PERIOD_LABEL = { 1: '1st Period', 2: '2nd Period', 3: '3rd Period', 4: 'Overtime' };
 
@@ -40,7 +40,7 @@ export function render(container, params) {
         if (step === 'pregame') {
             container.innerHTML = `
                 <div class="dashboard-panel text-center" style="max-width: 640px; margin: 0 auto;">
-                    <p style="color:#888;margin:0;">Week ${weekIndex + 1}</p>
+                    <p style="color:#888;margin:0;">${scheduleLabel(weekIndex + 1)}</p>
                     <h2 style="margin: 10px 0;">${esc(away.name)} <span style="color:#888;">(${record(away)})</span></h2>
                     <p style="color:#888;margin:0;">at</p>
                     <h2 style="margin: 10px 0;">${esc(home.name)} <span style="color:#888;">(${record(home)})</span></h2>

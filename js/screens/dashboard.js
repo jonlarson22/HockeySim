@@ -88,7 +88,7 @@ export function render(container) {
                     <h2>Conference Standings</h2>
                     <select id="dash-conf-select" class="input-field">${confOptions}</select>
                     <table class="standings-table">
-                        <thead><tr><th style="text-align:left;">Team</th><th style="text-align:center;">CONF</th><th style="text-align:center;">CPTS</th><th style="text-align:center;">OVR</th><th style="text-align:center;">OPTS</th></tr></thead>
+                        <thead><tr><th style="text-align:left;">Team</th><th style="text-align:center;" title="Conference record">CONF</th><th style="text-align:center;" title="Conference points">CPTS</th><th style="text-align:center;" title="Overall record">OVR</th><th style="text-align:center;" title="Overall points">OPTS</th></tr></thead>
                         <tbody id="dash-standings"></tbody>
                     </table>
                 </div>

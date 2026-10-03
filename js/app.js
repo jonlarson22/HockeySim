@@ -1,6 +1,13 @@
 // app.js — bootstrap. Registers screens and shows the first one.
 // Screen modules own their DOM and events; engine modules own simulation.
 
+// Offline support: cache the game shell so it works without a connection.
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+}
+
 import { registerScreen, showScreen } from './router.js';
 import * as MenuScreen from './screens/menu.js';
 import * as CoachCreationScreen from './screens/coachCreation.js';

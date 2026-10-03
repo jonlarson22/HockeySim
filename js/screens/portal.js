@@ -103,7 +103,7 @@ export function render(container) {
             <h2>Transfer Portal</h2>
             ${inviteHTML}
             ${realignLog ? `<div style="margin-bottom:12px;color:#aaa;">${realignLog}</div>` : ''}
-            <p style="color:#aaa;">Proven college players with visible OVR. Spending here comes out of your recruiting budget — freshman week 1 will have <strong>${Math.max(0, pointsLeft)} pts</strong> left.</p>
+            <p style="color:#aaa;">Portal spending comes out of your recruiting budget — freshman week 1 will have <strong>${Math.max(0, pointsLeft)} pts</strong> left.</p>
             <p><strong>Budget:</strong> <span style="color:#4ade80;">${pointsLeft} / ${budget} pts</span> remaining</p>
             ${considering.length ? `<h3>Your players considering transfer</h3><div style="display:grid;gap:8px;margin-bottom:16px;">${retainCards}</div>` : ''}
             <h3>In the portal (${portal.length})</h3>
