@@ -5,7 +5,7 @@ import { getState, update } from './store.js';
 import { showScreen } from './router.js';
 import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
 import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
-import { generateProspectPool, processRecruitingWeek } from './recruiting.js';
+import { generateProspectPool, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
 import { conferences } from './data.js';
 
 // Simulates the current week for the whole league.
@@ -15,17 +15,29 @@ export function simCurrentWeek() {
     let seasonActive = false;
     update(state => {
         seasonActive = simulateWeek(state);
+        // In-season recruiting background: lazy pool for migrated saves,
+        // then the target-board drip + phantom rival creep.
+        if (!state.prospectPool || !state.prospectPool.length) {
+            state.prospectPool = generateProspectPool();
+            state.recruitTargets = [];
+        }
+        processInseasonWeek(state);
     });
     return { weekIndex, seasonActive };
 }
 
-// Routes after a sim: season recap when the year is done, the game-day
-// replay when the user's team played, otherwise the weekly recap.
+// Routes after a sim: season recap when the year is done, the recruiting
+// window when one opens, the game-day replay when the user's team played,
+// otherwise the weekly recap.
 export function goAfterSimWeek(weekIndex, seasonActive) {
     const s = getState();
     const team = s.leagueTeams.find(t => t.id === s.teamId);
     if (!seasonActive) { showScreen('season-recap'); return; }
     const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
+    if (INSEASON_WINDOW_WEEKS.includes(weekIndex + 1)) {
+        showScreen('recruit-window', { weekIndex, confId: team.confId, hadGame: !!(myGame && myGame.events) });
+        return;
+    }
     if (myGame && myGame.events) showScreen('game-day', { weekIndex, confId: team.confId });
     else showScreen('weekly-recap', { weekIndex, confId: team.confId });
 }
@@ -38,7 +50,11 @@ export function beginOffseason() {
         refillAIRosters(state);
         state.recruitingWeek = 1;
         state.recruitWeekAlloc = {};
-        state.prospectPool = generateProspectPool();
+        // Same pool the user courted all season, with light turnover —
+        // never a prospect they showed interest in.
+        if (state.prospectPool && state.prospectPool.length) applyPoolTurnover(state.prospectPool);
+        else state.prospectPool = generateProspectPool();
+        state.recruitTargets = [];
         state.seasonResolution = null;
     });
 }
@@ -115,6 +131,35 @@ export function submitRecruitingWeek() {
     return { logs, done };
 }
 
+// Submits an in-season recruiting window. Points bank as early interest;
+// nothing signs in-season. Routing is left to the calling screen.
+export function submitRecruitWindow() {
+    let touched = 0;
+    update(state => {
+        const res = processRecruitWindow(state, state.recruitWeekAlloc || {});
+        touched = res.touched;
+        state.recruitWeekAlloc = {};
+    });
+    return { touched };
+}
+
+// Stars/unstars a prospect on the in-season target board (max 5).
+// Returns 'added', 'removed', 'full', or 'invalid'.
+export function toggleRecruitTarget(prospectId) {
+    let result = 'invalid';
+    update(state => {
+        const pool = state.prospectPool || [];
+        const p = pool.find(x => x.id === prospectId);
+        if (!p || p.signedBy) { result = 'invalid'; return; }
+        const targets = state.recruitTargets || (state.recruitTargets = []);
+        const idx = targets.indexOf(prospectId);
+        if (idx >= 0) { targets.splice(idx, 1); result = 'removed'; }
+        else if (targets.length >= MAX_RECRUIT_TARGETS) { result = 'full'; }
+        else { targets.push(prospectId); p.isUserTarget = true; result = 'added'; }
+    });
+    return result;
+}
+
 function finalizeOffseason(state) {
     const team = state.leagueTeams.find(t => t.id === state.teamId);
     const pool = state.prospectPool || [];
@@ -135,6 +180,8 @@ function finalizeOffseason(state) {
     state.currentWeek = 1;
     state.schedule = generateSeasonSchedule(state.leagueTeams, conferences);
     state.recruitingWeek = 0;
-    state.prospectPool = [];
     state.recruitWeekAlloc = {};
+    state.recruitTargets = [];
+    // Fresh class to court during the new season.
+    state.prospectPool = generateProspectPool();
 }

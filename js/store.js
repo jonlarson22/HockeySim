@@ -58,7 +58,10 @@ export function newCareerState() {
         currentWeek: 1,
         trainingFocus: 'balanced',
         leagueTeams: [],
-        schedule: []
+        schedule: [],
+        prospectPool: [],
+        recruitTargets: [],
+        recruitWeekAlloc: {}
     };
 }
 
@@ -128,6 +131,9 @@ function migrate(s, version) {
     if (s.roster) delete s.roster;
     if (typeof s.currentWeek !== 'number') s.currentWeek = 1;
     if (typeof s.year !== 'number') s.year = 2026;
+    if (!Array.isArray(s.prospectPool)) s.prospectPool = [];
+    if (!Array.isArray(s.recruitTargets)) s.recruitTargets = [];
+    if (!s.recruitWeekAlloc || typeof s.recruitWeekAlloc !== 'object') s.recruitWeekAlloc = {};
     return s;
 }
 

@@ -3,6 +3,7 @@ import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
 import { pollScore, TRAINING_FOCUSES } from '../engine.js';
+import { dripPerWeek, MAX_RECRUIT_TARGETS } from '../recruiting.js';
 import { conferences } from '../data.js';
 import { esc, scheduleLabel } from '../ui.js';
 
@@ -59,6 +60,10 @@ export function render(container) {
                         <select id="dash-focus" class="input-field" style="margin-top: 5px;">
                             ${TRAINING_FOCUSES.map(f => `<option value="${f.key}">${esc(f.label)}</option>`).join('')}
                         </select>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #aaa;">
+                        🎯 Recruiting Board: <strong style="color:#fff;">${(s.recruitTargets || []).length}/${MAX_RECRUIT_TARGETS}</strong>
+                        <span style="color:#666;">(+${dripPerWeek(s.coach)}/wk each)</span>
                     </div>
                 </div>
                 <div class="dashboard-panel">

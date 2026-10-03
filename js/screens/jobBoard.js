@@ -2,6 +2,7 @@
 import { getState, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { generateSeasonSchedule } from '../engine.js';
+import { generateProspectPool } from '../recruiting.js';
 import { conferences } from '../data.js';
 
 export function render(container) {
@@ -32,6 +33,10 @@ export function render(container) {
                 st.teamId = teamId;
                 st.schedule = generateSeasonSchedule(st.leagueTeams, conferences);
                 st.currentWeek = 1;
+                // First season's recruiting class: same pool the offseason will use.
+                st.prospectPool = generateProspectPool();
+                st.recruitTargets = [];
+                st.recruitWeekAlloc = {};
             });
             showScreen('dashboard');
         });

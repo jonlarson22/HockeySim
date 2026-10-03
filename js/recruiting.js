@@ -137,3 +137,85 @@ export function processRecruitingWeek(state, userAllocations) {
 
     return recap;
 }
+
+// ---- In-season recruiting ----
+// The same 200-prospect pool persists all season. Windows + the target-board
+// drip bank early interest (userPoints); nothing signs in-season — this is
+// positioning for the offseason battle, which reuses the pool (with turnover).
+
+// 1-based weeks when a recruiting window opens (regular season runs 1-38).
+export const INSEASON_WINDOW_WEEKS = [10, 22, 34];
+export const MAX_RECRUIT_TARGETS = 5;
+// Share of the pool turned over when the offseason begins (>=85% retained).
+export const POOL_TURNOVER_FRACTION = 0.15;
+
+// One window's point budget: deliberately smaller than an offseason week.
+export function calculateWindowPoints(team, coach) {
+    let points = 50;
+    points += ((coach.skills?.recruiting || 3) * 2);
+    points += ((team.prestige || 50) * 0.5);
+    return Math.floor(points);
+}
+
+// Weekly drip per starred target.
+export function dripPerWeek(coach) {
+    return 1 + Math.floor((coach.skills?.recruiting || 3) / 12);
+}
+
+// Weekly background: starred targets accrue interest, phantom rivals creep.
+// No commitments resolve in-season.
+export function processInseasonWeek(state) {
+    const pool = state.prospectPool || [];
+    if (!pool.length) return;
+    const drip = dripPerWeek(state.coach);
+    const targets = state.recruitTargets || [];
+    // Prune dead target ids.
+    state.recruitTargets = targets.filter(id => {
+        const p = pool.find(x => x.id === id);
+        return p && !p.signedBy;
+    });
+    state.recruitTargets.forEach(id => {
+        const p = pool.find(x => x.id === id);
+        if (p && !p.signedBy) {
+            p.userPoints += drip;
+            p.isUserTarget = true;
+        }
+    });
+    pool.forEach(p => {
+        if (p.signedBy) return;
+        p.rivalInterest += Math.max(0, Math.round(p.rivalGrowth * 0.08 + randomInt(-1, 1)));
+    });
+}
+
+// A window's allocations bank as early interest. No signings resolve here.
+export function processRecruitWindow(state, allocations) {
+    const pool = state.prospectPool || [];
+    let touched = 0;
+    for (const [id, pts] of Object.entries(allocations || {})) {
+        if (pts <= 0) continue;
+        const p = pool.find(x => x.id === id);
+        if (!p || p.signedBy) continue;
+        p.userPoints += pts;
+        p.isUserTarget = true;
+        touched++;
+    }
+    return { touched };
+}
+
+// Offseason turnover: replace ~15% of the pool, but never a prospect the
+// user has shown interest in. Coldest (lowest rival interest) go first.
+export function applyPoolTurnover(pool) {
+    const target = Math.round(pool.length * POOL_TURNOVER_FRACTION);
+    const candidates = pool
+        .filter(p => !p.signedBy && (p.userPoints || 0) === 0 && !p.isUserTarget)
+        .sort((a, b) => a.rivalInterest - b.rivalInterest);
+    let replaced = 0;
+    for (const old of candidates.slice(0, target)) {
+        const idx = pool.indexOf(old);
+        if (idx >= 0) {
+            pool[idx] = generateProspect(old.position, Math.floor(Math.random() * 80) + 10);
+            replaced++;
+        }
+    }
+    return replaced;
+}
