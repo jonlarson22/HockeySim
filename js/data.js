@@ -78,11 +78,13 @@ export const firstNames = [
   "Wayne", "Gordie", "Alex", "Sidney", "Mike", "Chris", "Mario", "Bobby",
   "Mark", "Steve", "Joe", "Peter", "Nicklas", "Dominik", "Jaromir", "Brett",
   "Maurice", "Jean", "Guy", "Bryan", "Denis", "Phil", "Eric",
+  // Hart winners' first names
+  "Jose", "Henrik", "Corey", "Carey", "Patrick", "Taylor", "Leon", "Auston",
 ];
 
 export const lastNames = [
   // Canadian (English)
-  "Smith", "Brown", "Wilson", "Taylor", "Moore", "Clark", "Lewis", "Walker", "Hall", "Young",
+  "Smith", "Brown", "Wilson", "Taylor", "Moore", "Clark", "Lewis", "Walker", "Carney", "Young",
   "King", "Wright", "Scott", "Green", "Baker", "Adams", "Nelson", "Carter", "Mitchell", "Turner",
   // Canadian (French)
   "Roy", "Bouchard", "Tremblay", "Gagnon", "Pelletier", "Lavoie", "Couture", "Morin", "Bergeron", "Gallagher",
@@ -100,20 +102,29 @@ export const lastNames = [
   // Czech / Slovak
   "Novak", "Svoboda", "Dvorak", "Prochazka", "Krejci", "Hertl", "Pastrnak", "Chara", "Hossa", "Gaborik",
   // Swiss / German
-  "Weber", "Muller", "Schmid", "Keller", "Fiala", "Hischier", "Draisaitl", "Stutzle",
+  "Weber", "Muller", "Schmid", "Keller", "Fiala", "Hischier", "Stutzle",
+  // North American (evening out the pools)
+  "Campbell", "Fraser", "McKenzie", "Sullivan", "Murphy", "Kelly", "Ryan", "Burns",
+  "Kennedy", "Ferguson", "Patterson", "Graham", "Duncan", "Boyd", "Crawford", "Bishop",
+  "Fowler", "Hamilton", "Schultz", "McLeod", "Callahan", "Delaney", "Flynn", "Grady",
+  "Hogan", "Keating", "Lynch", "Malone", "Nugent", "O'Brien", "Quinn", "Reilly",
   // Famous hockey bloodlines (is he related?)
   "Gretzky", "Howe", "Ovechkin", "Crosby", "Modano", "Chelios", "Zubov", "Lemieux",
   "Orr", "Messier", "Yzerman", "Sakic", "Forsberg", "Lidstrom", "Brodeur", "Hasek",
   "Jagr", "Fedorov", "Bure", "Hull",
 ];
 
-export const regularLastNames = lastNames.slice(0, 100);
-export const famousLastNames = lastNames.slice(100);
+export const regularLastNames = lastNames.slice(0, 131);
+export const famousLastNames = lastNames.slice(131);
 
 // Second wave of bloodlines (30 total at the same 4% weight — each one rarer).
 famousLastNames.push(
   "Richard", "Beliveau", "Lafleur", "Bossy", "Trottier",
-  "Potvin", "Esposito", "Selanne", "Lindros", "McDavid"
+  "Potvin", "Esposito", "Selanne", "Lindros", "McDavid",
+  // Hart Trophy winners 1990-2025 not already listed
+  "Pronger", "Theodore", "St. Louis", "Thornton", "Sedin",
+  "Perry", "Malkin", "Price", "Kane", "Hall",
+  "Kucherov", "Draisaitl", "Matthews", "MacKinnon", "Hellebuyck"
 );
 
 // 4. Helper Function: Generate a Random Player Name
