@@ -2,6 +2,7 @@
 // Each action mutates state through the store (which autosaves).
 
 import { getState, update } from './store.js';
+import { showScreen } from './router.js';
 import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, nationalRank } from './engine.js';
 import { generateProspectPool, processRecruitingWeek } from './recruiting.js';
 import { conferences } from './data.js';
@@ -15,6 +16,17 @@ export function simCurrentWeek() {
         seasonActive = simulateWeek(state);
     });
     return { weekIndex, seasonActive };
+}
+
+// Routes after a sim: season recap when the year is done, the game-day
+// replay when the user's team played, otherwise the weekly recap.
+export function goAfterSimWeek(weekIndex, seasonActive) {
+    const s = getState();
+    const team = s.leagueTeams.find(t => t.id === s.teamId);
+    if (!seasonActive) { showScreen('season-recap'); return; }
+    const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
+    if (myGame && myGame.events) showScreen('game-day', { weekIndex, confId: team.confId });
+    else showScreen('weekly-recap', { weekIndex, confId: team.confId });
 }
 
 // Records the finished season in coach history, runs offseason progression,

@@ -343,6 +343,78 @@ function calculateTeamRatings(teamId, gameState) {
     return { offense: offOvr, defense: defOvr, goalie: goalieOvr, coachOffBoost, coachDefBoost };
 }
 
+// Weighted random forward: top-line players score more often.
+function weightedForward(forwards, excludeIds = []) {
+    const pool = forwards.filter(p => !excludeIds.includes(p.id));
+    if (pool.length === 0) return null;
+    const weights = pool.map(p => Math.pow(p.overall, 2));
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < pool.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+}
+
+// Builds a period-by-period goal log for an already-simmed game. The final
+// score is drawn exactly as before; this only distributes those goals across
+// periods and attaches scorer/assist names so the game-day screen can replay
+// the game. Regulation goals go to periods 1-3; the OT winner gets period 4.
+export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT) {
+    const periodWeights = [0.32, 0.34, 0.34];
+    const homeFwds = getActivePlayers(homeTeam.roster.forwards);
+    const awayFwds = getActivePlayers(awayTeam.roster.forwards);
+    const events = [];
+
+    const makeGoal = (team, fwds, period) => {
+        const scorer = weightedForward(fwds) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
+        const a1 = Math.random() < 0.85 ? weightedForward(fwds, [scorer.id]) : null;
+        const a2 = a1 && Math.random() < 0.6 ? weightedForward(fwds, [scorer.id, a1.id]) : null;
+        events.push({
+            period,
+            minute: Math.floor(Math.random() * 20) + 1,
+            second: Math.floor(Math.random() * 60),
+            teamId: team.id,
+            scorer: `${scorer.firstName} ${scorer.lastName}`,
+            assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`)
+        });
+    };
+
+    const dealGoals = (team, fwds, count) => {
+        for (let i = 0; i < count; i++) {
+            const roll = Math.random();
+            let period = 3, acc = 0;
+            for (let p = 0; p < 3; p++) {
+                acc += periodWeights[p];
+                if (roll <= acc) { period = p + 1; break; }
+            }
+            makeGoal(team, fwds, period);
+        }
+    };
+
+    // The OT goal was already counted in the final score; re-deal it as period 4.
+    const homeOT = wentOT && homeGoals > awayGoals ? 1 : 0;
+    const awayOT = wentOT && awayGoals > homeGoals ? 1 : 0;
+    dealGoals(homeTeam, homeFwds, homeGoals - homeOT);
+    dealGoals(awayTeam, awayFwds, awayGoals - awayOT);
+
+    if (wentOT) {
+        const winner = homeGoals > awayGoals ? homeTeam : awayTeam;
+        makeGoal(winner, winner === homeTeam ? homeFwds : awayFwds, 4);
+    }
+
+    // Chronological order, then attach the running score to each event.
+    events.sort((a, b) => a.period - b.period || a.minute - b.minute || a.second - b.second);
+    let hs = 0, as = 0;
+    events.forEach(e => {
+        if (e.teamId === homeTeam.id) hs++; else as++;
+        e.homeScore = hs;
+        e.awayScore = as;
+    });
+
+    return events;
+}
+
 // --- SIMULATION ENGINE ---
 export function simulateWeek(gameState) {
     const currentWeekIndex = gameState.currentWeek - 1;
@@ -387,6 +459,11 @@ export function simulateWeek(gameState) {
         game.awayScore = awayGoals;
         game.ot = isOT;
         game.played = true;
+
+        // Period-by-period event log for the user's game (drives the game-day screen).
+        if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
+            game.events = buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, isOT);
+        }
 
         if (homeGoals > awayGoals) {
             homeTeam.wins = (homeTeam.wins || 0) + 1;

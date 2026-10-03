@@ -1,7 +1,7 @@
 // screens/dashboard.js — in-season hub.
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
-import { simCurrentWeek } from '../actions.js';
+import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
 import { pollScore } from '../engine.js';
 import { conferences } from '../data.js';
 import { esc, scheduleLabel } from '../ui.js';
@@ -104,8 +104,7 @@ export function render(container) {
 
     container.querySelector('#dash-sim').onclick = () => {
         const { weekIndex, seasonActive } = simCurrentWeek();
-        if (!seasonActive) { showScreen('season-recap'); return; }
-        showScreen('weekly-recap', { weekIndex, confId: team.confId });
+        goAfterSimWeek(weekIndex, seasonActive);
     };
 
     container.querySelector('#dash-debug').onclick = () => {

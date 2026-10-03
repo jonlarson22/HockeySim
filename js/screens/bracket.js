@@ -1,7 +1,7 @@
 // screens/bracket.js — conference + national tournament brackets.
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
-import { simCurrentWeek } from '../actions.js';
+import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
 import { conferences } from '../data.js';
 import { esc } from '../ui.js';
 
@@ -88,7 +88,6 @@ export function render(container) {
     container.querySelector('#bracket-back').onclick = () => showScreen('dashboard');
     container.querySelector('#bracket-sim').onclick = () => {
         const { weekIndex, seasonActive } = simCurrentWeek();
-        if (!seasonActive) { showScreen('season-recap'); return; }
-        showScreen('weekly-recap', { weekIndex, confId });
+        goAfterSimWeek(weekIndex, seasonActive);
     };
 }
