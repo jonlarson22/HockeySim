@@ -1046,13 +1046,20 @@ export function conferenceRealignment(gameState) {
         if (!weakTeams.length) continue;
         // Best team in the weak conference.
         const up = [...weakTeams].sort((a, b) => b.prestige - a.prestige)[0];
-        // Find a stronger conference with a clear gap that would take them.
+        // Candidate stronger conferences, closest first: a real step up (gap 6+)
+        // but no teleport (gap 15 max). Teams climb one rung at a time.
+        const targets = [];
         for (let j = 0; j < Math.floor(ranked.length / 2) && swaps < 2; j++) {
             const strongId = ranked[j];
-            if (confAvg[strongId] - confAvg[weakId] < 12) continue;
+            const gap = confAvg[strongId] - confAvg[weakId];
+            if (gap < 6 || gap > 15) continue;
             // They need to dominate their league (15+ above its average) and be
             // competitive up there (within 10 of the new average).
             if (up.prestige < confAvg[weakId] + 15 || up.prestige < confAvg[strongId] - 10) continue;
+            targets.push({ strongId, gap });
+        }
+        targets.sort((a, b) => a.gap - b.gap);
+        for (const { strongId } of targets) {
             const strongTeams = confTeams[strongId].filter(t => (t.seasonsInConf ?? 4) >= 4 && t.id !== gameState.teamId);
             if (!strongTeams.length) continue;
             // The weakest team in the strong conference makes room and goes down.
