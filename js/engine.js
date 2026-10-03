@@ -621,9 +621,11 @@ export function simulateWeek(gameState) {
             if (gap > 0) {
                 // Weekly growth scales with role: actives play, practice squad
                 // trains, redshirts develop — mirroring the offseason ratios.
+                // Gap coefficient is generous: high-ceiling players close on
+                // their potential instead of stalling halfway.
                 const roleFactor = player.status === 'Active Roster' ? 1.0
                     : player.status === 'Practice Squad' ? 0.5 : 0.33;
-                const progressionChance = (0.15 + ((coachDev / 30) * 0.20) + (gap * 0.005)) * roleFactor;
+                const progressionChance = (0.15 + ((coachDev / 30) * 0.20) + (gap * 0.010)) * roleFactor;
                 if (Math.random() < progressionChance) {
                     const statKeys = Object.keys(player.stats);
                     const focusPool = focusStatPool(gameState.trainingFocus, statKeys);
@@ -697,16 +699,35 @@ export function processOffSeason(gameState) {
             }
             // Higher-ceiling players develop faster in the offseason too —
             // same gap mechanic as weekly progression.
-            boostChance = Math.min(0.95, boostChance + gap * 0.005);
+            boostChance = Math.min(0.95, boostChance + gap * 0.015);
 
             if (Math.random() < boostChance) {
                 const statKeys = Object.keys(player.stats);
+                // The offseason is where real development happens: bigger jumps
+                // for high-ceiling players (+1 per 15 gap on top of the base +2-4).
+                const gapBonus = Math.floor(gap / 15);
                 statKeys.forEach(stat => {
                     if (Math.random() < 0.50 && player.stats[stat] < 99) {
-                        player.stats[stat] += Math.floor(Math.random() * 3) + 1;
+                        player.stats[stat] += Math.floor(Math.random() * 3) + 2 + gapBonus;
                     }
                 });
                 
+                let statTotal = 0;
+                for (let key in player.stats) {
+                    statTotal += player.stats[key];
+                }
+                player.overall = Math.round(statTotal / statKeys.length);
+            }
+
+            // Breakout: high-ceiling players sometimes explode in one offseason
+            // (+2-3 per stat). Rare enough to feel special when it hits.
+            const breakoutChance = seasonRole === 'Active Roster' ? 0.10
+                : seasonRole === 'Practice Squad' ? 0.05 : 0;
+            if (gap >= 15 && Math.random() < breakoutChance) {
+                const statKeys = Object.keys(player.stats);
+                statKeys.forEach(stat => {
+                    if (player.stats[stat] < 99) player.stats[stat] += Math.floor(Math.random() * 2) + 2;
+                });
                 let statTotal = 0;
                 for (let key in player.stats) {
                     statTotal += player.stats[key];
