@@ -358,7 +358,9 @@ function calculateTeamRatings(teamId, gameState) {
         coachOffBoost = 3 * ((gameState.coach.skills.offense || 3) / 30);
         coachDefBoost = 3 * ((gameState.coach.skills.defense || 3) / 30);
     } else {
-        const estimatedSkill = (team.prestige / 100) * 30;
+        // Compressed range: good programs hire better coaches, but prestige
+        // already pays through talent — this is a nudge, not a second tax.
+        const estimatedSkill = 10 + (team.prestige / 100) * 10;
         coachOffBoost = 3 * (estimatedSkill / 30);
         coachDefBoost = 3 * (estimatedSkill / 30);
     }
@@ -536,7 +538,10 @@ export function simulateWeek(gameState) {
         let isOT = false;
         if (homeGoals === awayGoals) {
             isOT = true;
-            if (Math.random() > 0.5) homeGoals++;
+            // Weighted OT: the team that "deserved" it in regulation
+            // (by expected-goals edge) wins more overtimes.
+            const pHome = Math.min(0.8, Math.max(0.2, 0.5 + (homeExpectedGoals - awayExpectedGoals) * 0.15));
+            if (Math.random() < pHome) homeGoals++;
             else awayGoals++;
         }
 
