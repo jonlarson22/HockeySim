@@ -1,5 +1,12 @@
-// recruiting.js
+// recruiting.js — offseason recruiting (user-only prospect pool).
+//
+// Only the user's program is simulated in detail. Every prospect attracts
+// phantom rival interest that grows weekly (hotter prospects draw more), so
+// recruiting keeps real signing battles without simulating 31 AI programs.
+// AI teams refill their own rosters with generated freshmen behind the scenes.
 import { getRandomFirstName, getRandomLastName } from './data.js';
+
+export const PROSPECT_POOL_SIZE = 200;
 
 export function getScoutedGrade(rating) {
     if (rating >= 90) return 'A';
@@ -66,23 +73,22 @@ function generateProspect(position, targetPrestige) {
         eligibilityYears: 4,
         redshirtUsed: false,
         injuryWeeks: 0,
-        // Recruiting Specific Properties
-        interest: {},          // { teamId: totalAccumulatedPoints }
-        committedTeamId: null, // null until committed
-        scoutedBy: {},         // { teamId: scoutLevel (0-2) }
-        commitThreshold: randomInt(120, 180) // Total points needed to trigger early commit
+        // Recruiting-specific
+        userPoints: 0,                              // points the user has spent
+        rivalInterest: 0,                           // phantom competing interest
+        rivalGrowth: randomInt(18, 30) + Math.floor(overall / 12),
+        commitThreshold: randomInt(120, 180),
+        isUserTarget: false,
+        signedBy: null                              // teamId, 'rival', or null
     };
 }
 
-export function generateProspectPool(gameState) {
-    const targetPoolSize = gameState.leagueTeams.length * 8 * 2;
-    let pool = [];
-
-    for (let i = 0; i < targetPoolSize; i++) {
-        let posRoll = Math.random();
-        let position = posRoll > 0.60 ? (posRoll > 0.90 ? 'G' : 'D') : 'F';
-        let qualityTier = Math.floor(Math.random() * 80) + 10;
-        pool.push(generateProspect(position, qualityTier));
+export function generateProspectPool() {
+    const pool = [];
+    for (let i = 0; i < PROSPECT_POOL_SIZE; i++) {
+        const roll = Math.random();
+        const position = roll > 0.60 ? (roll > 0.90 ? 'G' : 'D') : 'F';
+        pool.push(generateProspect(position, Math.floor(Math.random() * 80) + 10));
     }
     return pool;
 }
@@ -95,84 +101,39 @@ export function calculateRecruitingPoints(team, coach) {
     return Math.floor(points);
 }
 
-// Simulates 1 week of recruiting for AI and calculates user pitches
-export function processRecruitingWeek(gameState, userAllocations) {
-    const currentWeek = gameState.recruitingWeek || 1;
-    const pool = gameState.prospectPool || [];
-    const userTeamId = gameState.teamId;
-    const weeklyRecap = [];
+// One week of recruiting: user allocations land, rival interest grows,
+// commitments resolve. Returns the week's activity log.
+export function processRecruitingWeek(state, userAllocations) {
+    const week = state.recruitingWeek || 1;
+    const pool = state.prospectPool || [];
+    const userTeamId = state.teamId;
+    const userTeam = state.leagueTeams.find(t => t.id === userTeamId);
+    const recap = [];
 
-    // 1. Process User Point Allocations
-    for (const [prospectId, points] of Object.entries(userAllocations)) {
-        if (points <= 0) continue;
-        const prospect = pool.find(p => p.id === prospectId);
-        if (!prospect || prospect.committedTeamId) continue;
-
-        prospect.interest[userTeamId] = (prospect.interest[userTeamId] || 0) + points;
-        
-        // Auto-mark as target for quick filtering UI
-        prospect.isUserTarget = true;
+    for (const [id, pts] of Object.entries(userAllocations || {})) {
+        if (pts <= 0) continue;
+        const p = pool.find(x => x.id === id);
+        if (!p || p.signedBy) continue;
+        p.userPoints += pts;
+        p.isUserTarget = true;
     }
 
-    // 2. Process AI Team Recruiting Allocations
-    gameState.leagueTeams.forEach(team => {
-        if (team.id === userTeamId) return; // Skip user
+    pool.filter(p => !p.signedBy).forEach(p => {
+        p.rivalInterest += p.rivalGrowth + randomInt(-5, 5);
+        const finalWeek = week === 5;
 
-        const aiBudget = calculateRecruitingPoints(team, { skills: { recruiting: Math.floor(team.prestige / 3.3) } });
-        // AI targets prospects matched to their prestige level
-        const availableProspects = pool.filter(p => !p.committedTeamId);
-        
-        // Select 3 to 5 targets
-        const numTargets = Math.min(availableProspects.length, 4);
-        const targetSlice = availableProspects
-            .sort((a, b) => Math.abs(b.overall - (team.prestige * 0.8)) - Math.abs(a.overall - (team.prestige * 0.8)))
-            .slice(0, numTargets);
-
-        const pointsPerTarget = Math.floor(aiBudget / (numTargets || 1));
-        targetSlice.forEach(prospect => {
-            prospect.interest[team.id] = (prospect.interest[team.id] || 0) + pointsPerTarget;
-        });
-    });
-
-    // 3. Resolve Commitments
-    pool.filter(p => !p.committedTeamId).forEach(prospect => {
-        // Find top interested team
-        let topTeamId = null;
-        let maxPoints = 0;
-
-        for (const [teamId, pts] of Object.entries(prospect.interest)) {
-            if (pts > maxPoints) {
-                maxPoints = pts;
-                topTeamId = teamId;
+        if (p.userPoints >= p.commitThreshold && p.userPoints >= p.rivalInterest) {
+            p.signedBy = userTeamId;
+            if (p.isUserTarget) {
+                recap.push({ prospect: p, status: 'SIGNED', schoolName: userTeam ? userTeam.name : 'your program' });
             }
-        }
-
-        if (!topTeamId) return;
-
-        // Commit logic: Exceeds threshold or final week (Week 5)
-        const commitTriggered = maxPoints >= prospect.commitThreshold || currentWeek === 5;
-
-        if (commitTriggered) {
-            prospect.committedTeamId = topTeamId;
-            const committedTeam = gameState.leagueTeams.find(t => t.id === topTeamId);
-            
-            // Add to weekly recap if relevant to user or high profile
-            if (prospect.isUserTarget || topTeamId === userTeamId) {
-                weeklyRecap.push({
-                    prospect,
-                    status: topTeamId === userTeamId ? 'SIGNED' : 'LOST',
-                    schoolName: committedTeam ? committedTeam.name : 'Unknown'
-                });
-            }
-        } else if (prospect.isUserTarget) {
-            weeklyRecap.push({
-                prospect,
-                status: 'UNDECIDED',
-                topSchool: gameState.leagueTeams.find(t => t.id === topTeamId)?.name || 'None',
-                userInterest: prospect.interest[userTeamId] || 0
-            });
+        } else if (p.rivalInterest >= p.commitThreshold || (finalWeek && p.rivalInterest > p.userPoints)) {
+            p.signedBy = 'rival';
+            if (p.isUserTarget) recap.push({ prospect: p, status: 'LOST' });
+        } else if (p.isUserTarget) {
+            recap.push({ prospect: p, status: 'UNDECIDED', rivalInterest: Math.max(0, Math.round(p.rivalInterest)) });
         }
     });
 
-    return weeklyRecap;
+    return recap;
 }

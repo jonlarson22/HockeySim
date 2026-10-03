@@ -3,7 +3,7 @@
 
 import { getState, update } from './store.js';
 import { showScreen } from './router.js';
-import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, nationalRank } from './engine.js';
+import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
 import { generateProspectPool, processRecruitingWeek } from './recruiting.js';
 import { conferences } from './data.js';
 
@@ -43,9 +43,30 @@ export function beginOffseason() {
             rank: nationalRank(state.leagueTeams, state.teamId)
         });
         processOffSeason(state);
+        refillAIRosters(state);
         state.recruitingWeek = 1;
         state.recruitWeekAlloc = {};
-        state.prospectPool = generateProspectPool(state);
+        state.prospectPool = generateProspectPool();
+    });
+}
+
+// AI programs refill their rosters with generated freshmen to cover graduates.
+// (Their recruiting was never simulated — without this their rosters would
+// shrink every season.)
+function refillAIRosters(state) {
+    state.leagueTeams.forEach(t => {
+        if (t.id === state.teamId) return;
+        const want = { G: 3, D: 8, F: 15 };
+        const have = { G: t.roster.goalies.length, D: t.roster.defensemen.length, F: t.roster.forwards.length };
+        ['G', 'D', 'F'].forEach(pos => {
+            for (let i = have[pos]; i < want[pos]; i++) {
+                const p = generatePlayer(pos, t.prestige);
+                p.year = 'Fr';
+                if (pos === 'G') t.roster.goalies.push(p);
+                else if (pos === 'D') t.roster.defensemen.push(p);
+                else t.roster.forwards.push(p);
+            }
+        });
     });
 }
 
@@ -70,7 +91,7 @@ function finalizeOffseason(state) {
     const team = state.leagueTeams.find(t => t.id === state.teamId);
     const pool = state.prospectPool || [];
     if (team) {
-        pool.filter(p => p.committedTeamId === state.teamId).forEach(p => {
+        pool.filter(p => p.signedBy === state.teamId).forEach(p => {
             if (p.position === 'G') team.roster.goalies.push(p);
             else if (p.position === 'D') team.roster.defensemen.push(p);
             else team.roster.forwards.push(p);

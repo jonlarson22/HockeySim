@@ -14,7 +14,7 @@ export function render(container, params) {
             color = '#f87171';
             msg = `<strong>${esc(log.prospect.firstName)} ${esc(log.prospect.lastName)}</strong> signed with <strong>${esc(log.schoolName)}</strong>.`;
         } else {
-            msg = `<strong>${esc(log.prospect.firstName)} ${esc(log.prospect.lastName)}</strong> remains undecided. Top School: ${esc(log.topSchool)}`;
+            msg = `<strong>${esc(log.prospect.firstName)} ${esc(log.prospect.lastName)}</strong> remains undecided. Rival interest: ${log.rivalInterest} pts.`;
         }
         return `<div style="background:#222;padding:10px;border-radius:4px;border-left:4px solid ${color};">${msg}</div>`;
     }).join('');

@@ -41,7 +41,7 @@ export function initializeLeague(baseTeams) {
 }
 
 // Generate a single player
-function generatePlayer(position, teamPrestige) {
+export function generatePlayer(position, teamPrestige) {
     const isGoalie = position === 'G';
     const yearRoll = Math.random();
     

@@ -22,7 +22,7 @@ export function render(container) {
         const pointsLeft = budget - spent;
 
         const visible = pool.filter(p => {
-            if (p.committedTeamId) return false;
+            if (p.signedBy) return false;
             if (targetsOnly && !p.isUserTarget) return false;
             if (posFilter !== 'ALL' && p.position !== posFilter) return false;
             return true;
@@ -30,7 +30,7 @@ export function render(container) {
 
         const cards = visible.map(p => {
             const myAlloc = alloc[p.id] || 0;
-            const interest = p.interest[team.id] || 0;
+            const interest = p.userPoints || 0;
             const badge = p.isUserTarget ? `<span style="background:var(--accent);color:#000;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;margin-right:5px;">TARGETED</span>` : '';
             return `
                 <div style="background:#2a2a2a;padding:12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
