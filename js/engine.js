@@ -976,9 +976,11 @@ export function processOffSeason(gameState) {
     // League-wide prestige drift: AI programs rise and fall with results.
     // Whole conferences can shift over a decade — no permanent caste system.
     // (The user's team is handled separately by applySeasonConsequences.)
-    const danced = new Set();
+    const wonDanceGame = new Set();
     (gameState.schedule || []).forEach(week => (week || []).forEach(g => {
-        if (g.type === 'national_tourney') { danced.add(g.homeTeamId); danced.add(g.awayTeamId); }
+        if (g.type === 'national_tourney') {
+            if (g.homeScore != null) wonDanceGame.add(g.homeScore > g.awayScore ? g.homeTeamId : g.awayTeamId);
+        }
     }));
     gameState.leagueTeams.forEach(team => {
         if (team.id === gameState.teamId) return;
@@ -987,12 +989,12 @@ export function processOffSeason(gameState) {
         const winPct = ((team.wins || 0) * 2 + (team.otl || 0)) / (gp * 2);
         const p = team.prestige || 50;
         let drift = 0;
-        if (p >= 80) drift = winPct >= 0.65 ? 1 : winPct < 0.5 ? -3 : -1;
+        if (p >= 80) drift = winPct >= 0.7 ? 1 : winPct < 0.55 ? -3 : -2;
         else if (p >= 65) drift = winPct >= 0.6 ? 2 : winPct < 0.45 ? -2 : 0;
-        else if (p >= 50) drift = winPct >= 0.55 ? 2 : winPct < 0.4 ? -1 : 1;
-        else if (p >= 35) drift = winPct >= 0.5 ? 3 : winPct < 0.35 ? -1 : 1;
-        else drift = winPct >= 0.45 ? 3 : 0;
-        if (danced.has(team.id)) drift += 2;
+        else if (p >= 50) drift = winPct >= 0.55 ? 1 : winPct < 0.45 ? -1 : 0;
+        else if (p >= 35) drift = winPct >= 0.55 ? 2 : winPct < 0.4 ? -2 : 0;
+        else drift = winPct >= 0.5 ? 2 : winPct < 0.35 ? -1 : 0;
+        if (wonDanceGame.has(team.id)) drift += 1;
         team.prestige = Math.max(1, Math.min(99, p + drift + randomInt(-1, 1)));
     });
 
