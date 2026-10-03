@@ -687,6 +687,7 @@ export function processOffSeason(gameState) {
             // of the season — not whatever their status happens to be this week.
             const seasonRole = majorityRole(player);
             player.roleWeeks = { active: 0, practice: 0, redshirt: 0 };
+            const gap = Math.max(0, (player.potential || 0) - (player.overall || 0));
             let boostChance = 0;
             if (seasonRole === 'Active Roster') boostChance = 0.60 + (coachDev * 0.01);
             else if (seasonRole === 'Practice Squad') boostChance = 0.30 + (coachDev * 0.01);
@@ -694,6 +695,9 @@ export function processOffSeason(gameState) {
                 boostChance = 0.20 + (coachDev * 0.01);
                 player.redshirtUsed = true; 
             }
+            // Higher-ceiling players develop faster in the offseason too —
+            // same gap mechanic as weekly progression.
+            boostChance = Math.min(0.95, boostChance + gap * 0.005);
 
             if (Math.random() < boostChance) {
                 const statKeys = Object.keys(player.stats);
