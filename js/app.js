@@ -6,10 +6,20 @@ import * as MenuScreen from './screens/menu.js';
 import * as CoachCreationScreen from './screens/coachCreation.js';
 import * as JobBoardScreen from './screens/jobBoard.js';
 import * as DashboardScreen from './screens/dashboard.js';
+import * as RosterScreen from './screens/roster.js';
+import * as CoachProfileScreen from './screens/coachProfile.js';
+import * as ScheduleScreen from './screens/schedule.js';
+import * as WeeklyRecapScreen from './screens/weeklyRecap.js';
+import * as BracketScreen from './screens/bracket.js';
 
 registerScreen('menu', MenuScreen);
 registerScreen('coach-creation', CoachCreationScreen);
 registerScreen('job-board', JobBoardScreen);
 registerScreen('dashboard', DashboardScreen);
+registerScreen('roster', RosterScreen);
+registerScreen('coach-profile', CoachProfileScreen);
+registerScreen('schedule', ScheduleScreen);
+registerScreen('weekly-recap', WeeklyRecapScreen);
+registerScreen('bracket', BracketScreen);
 
 showScreen('menu');

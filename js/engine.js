@@ -414,9 +414,12 @@ export function simulateWeek(gameState) {
     });
     
     // --- INJURY MANAGEMENT & PROGRESSION ---
-    if (gameState.roster) {
+    // Roster lives on the user's team object (see store.js) — never a top-level duplicate.
+    const userTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
+    const userRoster = userTeam ? userTeam.roster : null;
+    if (userRoster) {
         const coachDev = gameState.coach.skills.development || 5;
-        const allPlayers = [...gameState.roster.goalies, ...gameState.roster.defensemen, ...gameState.roster.forwards];
+        const allPlayers = [...userRoster.goalies, ...userRoster.defensemen, ...userRoster.forwards];
         
         allPlayers.forEach(player => {
             if (player.injuryWeeks > 0) {
@@ -428,7 +431,7 @@ export function simulateWeek(gameState) {
                 player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
                 player.status = 'Practice Squad';
                 // Auto-replace with best available practice squad player
-                const allPracticeSquad = [...gameState.roster.forwards, ...gameState.roster.defensemen, ...gameState.roster.goalies]
+                const allPracticeSquad = [...userRoster.forwards, ...userRoster.defensemen, ...userRoster.goalies]
                     .filter(p => p.status === 'Practice Squad' && p.id !== player.id)
                     .sort((a, b) => b.overall - a.overall);
                 if (allPracticeSquad.length > 0) {
