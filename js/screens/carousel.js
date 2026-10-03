@@ -17,7 +17,7 @@ export function render(container) {
     if (!res) { showScreen('season-recap'); return; }
     const team = getUserTeam();
 
-    const goOffseason = () => { beginOffseason(); showScreen('recruiting'); };
+    const goOffseason = () => { beginOffseason(); showScreen('portal'); };
 
     if (res.fired) {
         const openings = res.openings

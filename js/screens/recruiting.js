@@ -3,6 +3,7 @@ import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { submitRecruitingWeek } from '../actions.js';
 import { calculateRecruitingPoints, getScoutedGrade, getPotentialDescriptor } from '../recruiting.js';
+import { freshmanWeekBudget } from '../portal.js';
 import { esc } from '../ui.js';
 
 const STEP = 10;
@@ -17,7 +18,7 @@ export function render(container) {
         const team = getUserTeam();
         const pool = s.prospectPool || [];
         const alloc = s.recruitWeekAlloc || {};
-        const budget = calculateRecruitingPoints(team, s.coach);
+        const budget = freshmanWeekBudget(s, s.recruitingWeek || 1);
         const spent = Object.values(alloc).reduce((a, b) => a + b, 0);
         const pointsLeft = budget - spent;
 
@@ -114,7 +115,7 @@ export function render(container) {
                 const id = btn.getAttribute('data-add');
                 const st = getState();
                 const a = st.recruitWeekAlloc || {};
-                const budgetNow = calculateRecruitingPoints(getUserTeam(), st.coach);
+                const budgetNow = freshmanWeekBudget(st, st.recruitingWeek || 1);
                 const spentNow = Object.values(a).reduce((x, y) => x + y, 0);
                 if (budgetNow - spentNow >= STEP) setAlloc(id, (a[id] || 0) + STEP);
             });
@@ -134,7 +135,7 @@ export function render(container) {
                 const id = e.target.getAttribute('data-alloc');
                 const st = getState();
                 const a = st.recruitWeekAlloc || {};
-                const budgetNow = calculateRecruitingPoints(getUserTeam(), st.coach);
+                const budgetNow = freshmanWeekBudget(st, st.recruitingWeek || 1);
                 const spentNow = Object.values(a).reduce((x, y) => x + y, 0);
                 const cur = a[id] || 0;
                 let v = Math.floor((parseInt(e.target.value, 10) || 0) / STEP) * STEP;

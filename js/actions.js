@@ -7,6 +7,7 @@ import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSche
 import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
 import { generateProspectPool, assignPreferences, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
 import { fillVacantSlots } from './lines.js';
+import { planTransferPortal, buildTransferPortal, processPortalSubmit } from './portal.js';
 import { conferences } from './data.js';
 
 // Simulates the current week for the whole league.
@@ -48,7 +49,10 @@ export function goAfterSimWeek(weekIndex, seasonActive) {
 // and opens the 5-week recruiting period. Called from the season recap screen.
 export function beginOffseason() {
     update(state => {
+        // Portal planning needs roleWeeks intact; building needs years advanced.
+        planTransferPortal(state);
         processOffSeason(state);
+        buildTransferPortal(state);
         refillAIRosters(state);
         state.recruitingWeek = 1;
         state.recruitWeekAlloc = {};
@@ -59,7 +63,18 @@ export function beginOffseason() {
         assignPreferences(state.prospectPool, state.leagueTeams, state.teamId, state.coach);
         state.recruitTargets = [];
         state.seasonResolution = null;
+        state.portalSpent = 0;
     });
+}
+
+// Submits the transfer portal screen: retention + portal signings, then AI
+// pickup. Returns the result summary for the confirmation display.
+export function submitPortal(allocations, retainIds) {
+    let result = null;
+    update(state => {
+        result = processPortalSubmit(state, allocations, retainIds);
+    });
+    return result;
 }
 
 // AI programs refill their rosters with generated freshmen to cover graduates.
