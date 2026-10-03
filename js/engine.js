@@ -521,3 +521,23 @@ export function processOffSeason(gameState) {
 
     return true;
 }
+
+// --- LEAGUE RANKING HELPERS ---
+
+// Pseudo-poll score balancing points, win percentage, loss penalties, and prestige.
+export function pollScore(t) {
+    const w = t.wins || 0;
+    const l = t.losses || 0;
+    const otl = t.otl || 0;
+    const pts = (w * 2) + otl;
+    const gp = w + l + otl;
+    const winPct = gp > 0 ? pts / (gp * 2) : 0;
+    return (pts * 12) + (winPct * 50) + (t.prestige * 0.5) - (l * 2);
+}
+
+// National rank 1-25, or 99 when unranked.
+export function nationalRank(leagueTeams, teamId) {
+    const sorted = [...leagueTeams].sort((a, b) => pollScore(b) - pollScore(a));
+    const idx = sorted.findIndex(t => t.id === teamId);
+    return idx >= 0 && idx < 25 ? idx + 1 : 99;
+}

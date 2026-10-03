@@ -2,16 +2,9 @@
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
 import { simCurrentWeek } from '../actions.js';
+import { pollScore } from '../engine.js';
 import { conferences } from '../data.js';
 import { esc, scheduleLabel } from '../ui.js';
-
-function pollScore(t) {
-    const w = t.wins || 0, l = t.losses || 0, otl = t.otl || 0;
-    const pts = w * 2 + otl;
-    const gp = w + l + otl;
-    const winPct = gp > 0 ? pts / (gp * 2) : 0;
-    return pts * 12 + winPct * 50 + t.prestige * 0.5 - l * 2;
-}
 
 function shortName(name) {
     if (name.startsWith('New ') || name.startsWith('Rhode ')) {
@@ -111,19 +104,14 @@ export function render(container) {
 
     container.querySelector('#dash-sim').onclick = () => {
         const { weekIndex, seasonActive } = simCurrentWeek();
-        if (!seasonActive) {
-            // Season-recap screen lands next; until then, hold here.
-            alert('The season is complete. Season recap wiring is next.');
-            showScreen('dashboard');
-            return;
-        }
+        if (!seasonActive) { showScreen('season-recap'); return; }
         showScreen('weekly-recap', { weekIndex, confId: team.confId });
     };
 
     container.querySelector('#dash-debug').onclick = () => {
         let guard = 0;
         while (getState().currentWeek <= 45 && guard++ < 60) simCurrentWeek();
-        showScreen('dashboard');
+        showScreen(getState().currentWeek > 45 ? 'season-recap' : 'dashboard');
     };
 
     container.querySelector('#dash-schedule').onclick = () => showScreen('schedule');

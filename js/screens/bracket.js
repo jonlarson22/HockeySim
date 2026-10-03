@@ -88,11 +88,7 @@ export function render(container) {
     container.querySelector('#bracket-back').onclick = () => showScreen('dashboard');
     container.querySelector('#bracket-sim').onclick = () => {
         const { weekIndex, seasonActive } = simCurrentWeek();
-        if (!seasonActive) {
-            alert('The season is complete. Season recap wiring is next.');
-            showScreen('dashboard');
-            return;
-        }
+        if (!seasonActive) { showScreen('season-recap'); return; }
         showScreen('weekly-recap', { weekIndex, confId });
     };
 }
