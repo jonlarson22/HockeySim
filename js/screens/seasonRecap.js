@@ -1,10 +1,10 @@
 // screens/seasonRecap.js — end-of-season summary, gateway to the offseason.
 // Rendered BEFORE beginOffseason() runs, so record/graduates reflect the
 // season that just ended.
-import { getState, getUserTeam } from '../store.js';
+import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { resolveSeason } from '../actions.js';
-import { nationalRank } from '../engine.js';
+import { nationalRank, computeSeasonAwards, computeCoachAwards } from '../engine.js';
 import { tourneyRuns } from '../career.js';
 import { conferences } from '../data.js';
 import { esc } from '../ui.js';
@@ -42,6 +42,25 @@ export function render(container) {
     const runs = tourneyRuns(s, team);
     const confRun = runs.conf.label;
     const natRun = runs.nat.label;
+    // Awards are computed (and +1 OVR applied) before the offseason runs.
+    let awards;
+    update(s => { awards = computeSeasonAwards(s); });
+    const myAwards = awards.filter(a => a.team === team.name);
+    const awardsHTML = awards.length ? awards.map(a =>
+        `<div>${esc(a.name)} <span style="color:#aaa;">(${a.position}, ${esc(a.team)})</span> — <span style="color:var(--accent);">${esc(a.label)}</span> <span style="color:#4ade80;">+1 OVR</span></div>`
+    ).join('') : '<span style="color:#888;">None</span>';
+
+    // Coach of the Year. If the user won, they pick where the +1 skill point goes.
+    let coachAwards;
+    update(s => { coachAwards = computeCoachAwards(s); });
+    const myCoty = coachAwards.filter(a => a.isUser);
+    const cotyHTML = coachAwards.map(a => {
+        const conf = a.confId ? conferences.find(c => c.id === a.confId) : null;
+        const where = conf ? ` (${esc(conf.name)})` : '';
+        const yours = a.isUser ? ' <span style="color:var(--accent);">— YOU</span>' : '';
+        return `<div>${esc(a.label)}${where}: <strong>${esc(a.teamName)}</strong>${yours}</div>`;
+    }).join('');
+    const SKILL_LABELS = { offense: 'Offensive Tactics', defense: 'Defensive Tactics', development: 'Player Development', recruiting: 'Recruiting Prowess', scouting: 'Scouting Network' };
 
     container.innerHTML = `
         <div class="dashboard-panel" style="max-width: 1000px; margin: 0 auto;">
@@ -66,6 +85,19 @@ export function render(container) {
                     </div>
                 </div>
             </div>
+            <h3>Season Awards ${myAwards.length ? `<span style="color:var(--accent);">(${myAwards.length} yours!)</span>` : ''}</h3>
+            <div style="font-size: 0.9em; max-height: 180px; overflow-y: auto; margin-bottom: 10px;">
+                ${awardsHTML}
+            </div>
+            <h3>Coach of the Year</h3>
+            <div style="font-size: 0.9em; margin-bottom: 10px;">${cotyHTML}</div>
+            ${myCoty.length ? `
+            <div id="coty-bonus" style="background:#1a2e1a;border:1px solid #4ade80;border-radius:6px;padding:12px;margin-bottom:10px;">
+                <div style="margin-bottom:8px;">🏆 You won <strong>${myCoty.map(a => esc(a.label)).join(' + ')}</strong>! Pick where your +${myCoty.length} skill point${myCoty.length > 1 ? 's go' : ' goes'}:</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    ${Object.entries(SKILL_LABELS).map(([k, label]) => `<button class="secondary" data-skill="${k}" style="width:auto;">${label}</button>`).join('')}
+                </div>
+            </div>` : ''}
             <button id="recap-offseason" class="primary" style="width: 100%; margin-top: 20px;">Continue to Offseason</button>
         </div>`;
 
@@ -73,4 +105,25 @@ export function render(container) {
         resolveSeason();
         showScreen('carousel');
     };
+
+    // COTY skill point picker (if the user won).
+    const bonusBox = container.querySelector('#coty-bonus');
+    if (bonusBox) {
+        let remaining = myCoty.length;
+        bonusBox.querySelectorAll('button[data-skill]').forEach(btn => {
+            btn.onclick = () => {
+                if (remaining <= 0) return;
+                const key = btn.dataset.skill;
+                update(s => {
+                    s.coach.skills[key] = Math.min(30, (s.coach.skills[key] || 0) + 1);
+                });
+                remaining--;
+                btn.disabled = true;
+                btn.style.opacity = '0.4';
+                if (remaining <= 0) {
+                    bonusBox.querySelector('div').innerHTML = '✅ Skill point applied. Good luck next season!';
+                }
+            };
+        });
+    }
 }

@@ -672,6 +672,94 @@ export function majorityRole(player) {
     return 'Active Roster';
 }
 
+// End-of-season player awards. Computes winners, applies +1 OVR each
+// (capped at 99), and stores the list for the season recap screen.
+// Idempotent — safe to call from the recap render.
+export function computeSeasonAwards(gameState) {
+    if (gameState.seasonAwards) return gameState.seasonAwards;
+    const awards = [];
+    const give = (player, team, type, label) => {
+        player.overall = Math.min(99, (player.overall || 0) + 1);
+        awards.push({
+            type, label,
+            name: `${player.firstName} ${player.lastName}`,
+            team: team.name,
+            position: player.position,
+            overall: player.overall,
+            points: (player.seasonGoals || 0) + (player.seasonAssists || 0),
+        });
+    };
+
+    const skaters = [];
+    const goalies = [];
+    gameState.leagueTeams.forEach(team => {
+        team.roster.forwards.concat(team.roster.defensemen).forEach(p =>
+            skaters.push({ p, team, pts: (p.seasonGoals || 0) + (p.seasonAssists || 0) }));
+        team.roster.goalies.forEach(p => goalies.push({ p, team }));
+    });
+
+    // All-Americans: top 10 skaters by points, top 2 goalies by OVR.
+    skaters.sort((a, b) => b.pts - a.pts).slice(0, 10)
+        .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American'));
+    goalies.sort((a, b) => b.p.overall - a.p.overall).slice(0, 2)
+        .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American (G)'));
+
+    // Per-conference: Player of the Year and Rookie of the Year by points.
+    const confIds = [...new Set(gameState.leagueTeams.map(t => t.confId))];
+    confIds.forEach(confId => {
+        const conf = skaters.filter(s => s.team.confId === confId);
+        if (!conf.length) return;
+        const poy = [...conf].sort((a, b) => b.pts - a.pts)[0];
+        give(poy.p, poy.team, 'poy', 'Conference Player of the Year');
+        const rookies = conf.filter(s => s.p.year === 'Fr');
+        if (rookies.length) {
+            const roy = [...rookies].sort((a, b) => b.pts - a.pts)[0];
+            give(roy.p, roy.team, 'roy', 'Conference Rookie of the Year');
+        }
+    });
+
+    gameState.seasonAwards = awards;
+    return awards;
+}
+
+// Coach of the Year: best conference record per conference (lower prestige
+// wins ties — did more with less), national champ's coach wins nationally.
+// Returns [{ confId|null, teamName, coachName, type }]. The +1 skill point
+// is applied via the season recap UI (user picks the skill).
+export function computeCoachAwards(gameState) {
+    if (gameState.seasonCoachAwards) return gameState.seasonCoachAwards;
+    const awards = [];
+    const confIds = [...new Set(gameState.leagueTeams.map(t => t.confId))];
+    confIds.forEach(confId => {
+        const teams = gameState.leagueTeams.filter(t => t.confId === confId);
+        const sorted = [...teams].sort((a, b) => {
+            const aw = (a.confWins || 0) * 2 + (a.confOtl || 0);
+            const bw = (b.confWins || 0) * 2 + (b.confOtl || 0);
+            if (bw !== aw) return bw - aw;
+            return a.prestige - b.prestige; // did more with less
+        });
+        const winner = sorted[0];
+        if (winner) awards.push({
+            type: 'coty-conf', label: 'Conference Coach of the Year',
+            confId, teamName: winner.name,
+            isUser: winner.id === gameState.teamId,
+        });
+    });
+    // National: the champion's coach (final game of the schedule).
+    const champGame = (gameState.schedule[44] || [])[0];
+    if (champGame && champGame.homeScore !== null) {
+        const champId = champGame.homeScore > champGame.awayScore ? champGame.homeTeamId : champGame.awayTeamId;
+        const champ = gameState.leagueTeams.find(t => t.id === champId);
+        if (champ) awards.push({
+            type: 'coty-nat', label: 'National Coach of the Year',
+            confId: null, teamName: champ.name,
+            isUser: champ.id === gameState.teamId,
+        });
+    }
+    gameState.seasonCoachAwards = awards;
+    return awards;
+}
+
 export function processOffSeason(gameState) {
     const coachDev = gameState.coach.skills.development || 5;
 
@@ -758,20 +846,43 @@ export function processOffSeason(gameState) {
 
 // --- LEAGUE RANKING HELPERS ---
 
-// Pseudo-poll score balancing points, win percentage, loss penalties, and prestige.
-export function pollScore(t) {
+// Pseudo-poll score balancing points, win percentage, loss penalties, prestige,
+// and strength of schedule (average opponent win%).
+export function pollScore(t, leagueTeams = null, schedule = null) {
     const w = t.wins || 0;
     const l = t.losses || 0;
     const otl = t.otl || 0;
     const pts = (w * 2) + otl;
     const gp = w + l + otl;
     const winPct = gp > 0 ? pts / (gp * 2) : 0;
-    return (pts * 12) + (winPct * 50) + (t.prestige * 0.5) - (l * 2);
+    const sos = (leagueTeams && schedule) ? calcSOS(t, leagueTeams, schedule) : 0.5;
+    return (pts * 12) + (winPct * 50) + (t.prestige * 0.5) - (l * 2) + (sos * 50);
+}
+
+// Average win% of a team's scheduled opponents (uses record, not pollScore,
+// to avoid circularity). Neutral 0.5 when no schedule data.
+function calcSOS(t, leagueTeams, schedule) {
+    const oppIds = new Set();
+    for (const week of schedule || []) {
+        for (const g of week) {
+            if (g.homeTeamId === t.id) oppIds.add(g.awayTeamId);
+            else if (g.awayTeamId === t.id) oppIds.add(g.homeTeamId);
+        }
+    }
+    if (!oppIds.size) return 0.5;
+    let sum = 0;
+    for (const id of oppIds) {
+        const o = leagueTeams.find(x => x.id === id);
+        if (!o) continue;
+        const gw = (o.wins || 0) + (o.losses || 0) + (o.otl || 0);
+        sum += gw ? (((o.wins || 0) * 2 + (o.otl || 0)) / (gw * 2)) : 0.5;
+    }
+    return sum / oppIds.size;
 }
 
 // National rank 1-25, or 99 when unranked.
-export function nationalRank(leagueTeams, teamId) {
-    const sorted = [...leagueTeams].sort((a, b) => pollScore(b) - pollScore(a));
+export function nationalRank(leagueTeams, teamId, schedule = null) {
+    const sorted = [...leagueTeams].sort((a, b) => pollScore(b, leagueTeams, schedule) - pollScore(a, leagueTeams, schedule));
     const idx = sorted.findIndex(t => t.id === teamId);
     return idx >= 0 && idx < 25 ? idx + 1 : 99;
 }
