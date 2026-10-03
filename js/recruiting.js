@@ -101,6 +101,77 @@ export function generateProspectPool() {
     return pool;
 }
 
+// Recruit preferences: each prospect gets 2-3 favorite teams (their "top
+// schools" list) derived from home conference, prestige tier, and coach
+// style. Favorites get 25% more effective points from the user.
+// Tags are shown on the prospect card; the bump is the strategic hook.
+export function assignPreferences(pool, leagueTeams, userTeamId, userCoach) {
+    const confIds = [...new Set(leagueTeams.map(t => t.confId))];
+    const byConf = {};
+    confIds.forEach(id => byConf[id] = leagueTeams.filter(t => t.confId === id));
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+    pool.forEach(p => {
+        if (p.favorites) return; // already assigned
+        const favorites = [];
+        const tags = [];
+
+        // 1. Home conference (hometown kid).
+        const homeConf = pick(confIds);
+        const homeTeam = pick(byConf[homeConf]);
+        if (homeTeam) {
+            favorites.push(homeTeam.id);
+            const confName = homeTeam.confId; // tag uses conf id; UI resolves name
+            tags.push({ type: 'home', confId: homeConf });
+        }
+
+        // 2. Prestige tier: Spotlight (80+), Contender (60-79), Playing time (<60).
+        const tierRoll = Math.random();
+        let tierTeams, tierTag;
+        if (tierRoll < 0.33) { tierTeams = leagueTeams.filter(t => (t.prestige || 0) >= 80); tierTag = 'Spotlight seeker'; }
+        else if (tierRoll < 0.66) { tierTeams = leagueTeams.filter(t => (t.prestige || 0) >= 60 && (t.prestige || 0) < 80); tierTag = 'Wants a contender'; }
+        else { tierTeams = leagueTeams.filter(t => (t.prestige || 0) < 60); tierTag = 'Wants playing time'; }
+        if (tierTeams.length) {
+            const t = pick(tierTeams);
+            if (!favorites.includes(t.id)) favorites.push(t.id);
+            tags.push({ type: 'prestige', label: tierTag });
+        }
+
+        // 3. Coach style (50%): Development / Offense / Defense. Only the
+        // user's coach has meaningful skills — invest in a skill, win these kids.
+        if (Math.random() < 0.5 && userCoach) {
+            const styles = [
+                { key: 'development', label: 'Wants development', thresh: 8 },
+                { key: 'offense', label: 'Wants offense', thresh: 8 },
+                { key: 'defense', label: 'Wants defense', thresh: 8 },
+            ];
+            const style = pick(styles);
+            const skill = (userCoach.skills || {})[style.key] || 0;
+            tags.push({ type: 'coach', label: style.label });
+            if (skill >= style.thresh && userTeamId && !favorites.includes(userTeamId)) {
+                favorites.push(userTeamId);
+            } else if (homeTeam && favorites.length < 3 && !favorites.includes(homeTeam.id)) {
+                favorites.push(homeTeam.id); // fallback: another home team
+            }
+        }
+
+        // Ensure 2-3 favorites.
+        while (favorites.length < 2) {
+            const t = pick(leagueTeams);
+            if (!favorites.includes(t.id)) favorites.push(t.id);
+        }
+
+        p.favorites = favorites.slice(0, 3);
+        p.prefTags = tags;
+    });
+    return pool;
+}
+
+// 25% point effectiveness when the user's team is a favorite.
+export function preferenceMultiplier(p, userTeamId) {
+    return (p.favorites && userTeamId && p.favorites.includes(userTeamId)) ? 1.25 : 1.0;
+}
+
 export function calculateRecruitingPoints(team, coach) {
     let points = 60;
     points += ((coach.skills?.recruiting || 3) * 8);
@@ -122,7 +193,7 @@ export function processRecruitingWeek(state, userAllocations) {
         if (pts <= 0) continue;
         const p = pool.find(x => x.id === id);
         if (!p || p.signedBy) continue;
-        p.userPoints += pts;
+        p.userPoints += Math.round(pts * preferenceMultiplier(p, userTeamId));
         p.isUserTarget = true;
     }
 
@@ -185,7 +256,7 @@ export function processInseasonWeek(state) {
     state.recruitTargets.forEach(id => {
         const p = pool.find(x => x.id === id);
         if (p && !p.signedBy) {
-            p.userPoints += drip;
+            p.userPoints += Math.round(drip * preferenceMultiplier(p, state.teamId));
             p.isUserTarget = true;
         }
     });
@@ -203,7 +274,7 @@ export function processRecruitWindow(state, allocations) {
         if (pts <= 0) continue;
         const p = pool.find(x => x.id === id);
         if (!p || p.signedBy) continue;
-        p.userPoints += pts;
+        p.userPoints += Math.round(pts * preferenceMultiplier(p, state.teamId));
         p.isUserTarget = true;
         touched++;
     }

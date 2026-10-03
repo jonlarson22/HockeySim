@@ -492,6 +492,24 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
             if (a) a.seasonAssists = (a.seasonAssists || 0) + 1;
         }
     }
+
+    // Goalie saves: shots faced minus goals allowed. Same shot formula as
+    // buildGameShots (goals*7 + 3-8 per period, ~4 periods per game).
+    const getActive = (roster) => roster.filter(p => p.status === 'Active Roster' && !p.injuryWeeks);
+    const homeGoalie = getActive(homeTeam.roster.goalies)[0];
+    const awayGoalie = getActive(awayTeam.roster.goalies)[0];
+    const homeGoals = events.filter(e => e.teamId === homeTeam.id && e.scorerId && e.scorerId !== 'none').length;
+    const awayGoals = events.filter(e => e.teamId === awayTeam.id && e.scorerId && e.scorerId !== 'none').length;
+    if (homeGoalie) {
+        const sa = awayGoals * 7 + randomInt(12, 32);
+        homeGoalie.seasonSaves = (homeGoalie.seasonSaves || 0) + Math.max(0, sa - awayGoals);
+        homeGoalie.seasonShotsAgainst = (homeGoalie.seasonShotsAgainst || 0) + sa;
+    }
+    if (awayGoalie) {
+        const sa = homeGoals * 7 + randomInt(12, 32);
+        awayGoalie.seasonSaves = (awayGoalie.seasonSaves || 0) + Math.max(0, sa - homeGoals);
+        awayGoalie.seasonShotsAgainst = (awayGoalie.seasonShotsAgainst || 0) + sa;
+    }
 }
 
 // Derives per-period shots and saves from a game's goal events.
@@ -714,6 +732,9 @@ export function computeSeasonAwards(gameState) {
     const awards = [];
     const give = (player, team, type, label) => {
         player.overall = Math.min(99, (player.overall || 0) + 1);
+        const isGoalie = type === 'all-american' && label.includes('(G)');
+        const sa = player.seasonShotsAgainst || 0;
+        const savePct = sa > 0 ? ((player.seasonSaves || 0) / sa * 100).toFixed(1) + '%' : '—';
         awards.push({
             type, label,
             name: `${player.firstName} ${player.lastName}`,
@@ -721,24 +742,37 @@ export function computeSeasonAwards(gameState) {
             position: player.position,
             overall: player.overall,
             points: (player.seasonGoals || 0) + (player.seasonAssists || 0),
+            stat: isGoalie ? `${savePct} SV%` : `${(player.seasonGoals || 0) + (player.seasonAssists || 0)} pts`,
         });
     };
 
-    const skaters = [];
+    const forwards = [];
+    const defensemen = [];
     const goalies = [];
     gameState.leagueTeams.forEach(team => {
-        team.roster.forwards.concat(team.roster.defensemen).forEach(p =>
-            skaters.push({ p, team, pts: (p.seasonGoals || 0) + (p.seasonAssists || 0) }));
+        team.roster.forwards.forEach(p =>
+            forwards.push({ p, team, pts: (p.seasonGoals || 0) + (p.seasonAssists || 0) }));
+        team.roster.defensemen.forEach(p =>
+            defensemen.push({ p, team, pts: (p.seasonGoals || 0) + (p.seasonAssists || 0) }));
         team.roster.goalies.forEach(p => goalies.push({ p, team }));
     });
 
-    // All-Americans: top 10 skaters by points, top 2 goalies by OVR.
-    skaters.sort((a, b) => b.pts - a.pts).slice(0, 10)
+    // All-Americans by position: 6 forwards, 4 defensemen (by points within
+    // position — defenders would never make it on raw points alone),
+    // 2 goalies by save% (min 200 shots against, to avoid small-sample flukes).
+    forwards.sort((a, b) => b.pts - a.pts).slice(0, 6)
         .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American'));
-    goalies.sort((a, b) => b.p.overall - a.p.overall).slice(0, 2)
+    defensemen.sort((a, b) => b.pts - a.pts).slice(0, 4)
+        .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American'));
+    const goalieSavePct = g => {
+        const sa = g.p.seasonShotsAgainst || 0;
+        return sa >= 200 ? (g.p.seasonSaves || 0) / sa : -1;
+    };
+    goalies.sort((a, b) => goalieSavePct(b) - goalieSavePct(a)).slice(0, 2)
         .forEach(({ p, team }) => give(p, team, 'all-american', 'All-American (G)'));
 
     // Per-conference: Player of the Year and Rookie of the Year by points.
+    const skaters = forwards.concat(defensemen);
     const confIds = [...new Set(gameState.leagueTeams.map(t => t.confId))];
     confIds.forEach(confId => {
         const conf = skaters.filter(s => s.team.confId === confId);
@@ -797,6 +831,26 @@ export function computeCoachAwards(gameState) {
 export function processOffSeason(gameState) {
     const coachDev = gameState.coach.skills.development || 5;
 
+    // Early NHL draft declarations: juniors/seniors only. Probability scales
+    // with OVR — a 76 is ~10%, an 85 ~55%, capped at 80% (never guaranteed,
+    // even for a 94). Hits AI contenders too, so the rich get churned.
+    const declared = [];
+    gameState.leagueTeams.forEach(team => {
+        ['forwards', 'defensemen', 'goalies'].forEach(key => {
+            team.roster[key] = team.roster[key].filter(p => {
+                if ((p.year === 'Jr' || p.year === 'Sr') && p.injuryWeeks === 0) {
+                    const prob = Math.min(0.8, Math.max(0, ((p.overall || 0) - 74) * 0.05));
+                    if (Math.random() < prob) {
+                        declared.push({ name: `${p.firstName} ${p.lastName}`, team: team.name, overall: p.overall, year: p.year });
+                        return false;
+                    }
+                }
+                return true;
+            });
+        });
+    });
+    if (declared.length) gameState.draftDeclarations = declared;
+
     gameState.leagueTeams.forEach(team => {
         team.roster.forwards = team.roster.forwards.filter(p => p.year !== 'Sr');
         team.roster.defensemen = team.roster.defensemen.filter(p => p.year !== 'Sr');
@@ -807,6 +861,8 @@ export function processOffSeason(gameState) {
         allReturning.forEach(player => {
             player.seasonGoals = 0;
             player.seasonAssists = 0;
+            player.seasonSaves = 0;
+            player.seasonShotsAgainst = 0;
             // Offseason math keys off the role the player actually filled most
             // of the season — not whatever their status happens to be this week.
             const seasonRole = majorityRole(player);

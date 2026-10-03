@@ -37,13 +37,20 @@ export function render(container) {
             const myAlloc = alloc[p.id] || 0;
             const interest = p.userPoints || 0;
             const badge = p.isUserTarget ? `<span style="background:var(--accent);color:#000;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;margin-right:5px;">TARGETED</span>` : '';
+            const isFav = p.favorites && p.favorites.includes(s.teamId);
+            const favBadge = isFav ? '<span style="background:#4ade80;color:#000;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;margin-right:5px;" title="Top school: +25% point effectiveness">TOP SCHOOL</span>' : '';
+            const prefTags = (p.prefTags || []).map(t => {
+                const label = t.type === 'home' ? 'Home: ' + t.confId : t.label;
+                return '<span style="background:#333;color:#aaa;padding:1px 5px;border-radius:3px;font-size:0.75em;margin-right:4px;">' + esc(label) + '</span>';
+            }).join('');
             return `
                 <div style="background:#2a2a2a;padding:12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
                     <div>
-                        <div>${badge}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong> (${p.position})</div>
+                        <div>${badge}${favBadge}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong> (${p.position})</div>
                         <div style="font-size:0.85em;color:#aaa;margin-top:4px;">
                             Grade: <strong>${showOVR ? p.overall : getScoutedGrade(p.overall)}</strong> | Pot: <strong>${showPOT ? p.potential : getPotentialDescriptor(p.potential)}</strong> | Total Interest: <span style="color:#4ade80;">${interest} pts</span>
                         </div>
+                        ${prefTags ? `<div style="margin-top:4px;">${prefTags}</div>` : ''}
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <button class="secondary" data-sub="${p.id}" style="width:30px;padding:4px;">-</button>
@@ -59,6 +66,13 @@ export function render(container) {
                     <div>
                         <h2>Offseason Recruiting — Week ${s.recruitingWeek}/5</h2>
                         <p style="color:#aaa;margin:0;">Points Available: <strong style="color:var(--accent);">${pointsLeft}</strong></p>
+                        ${(s.draftDeclarations || []).length ? `
+                        <div style="margin-top:10px;padding:10px;background:#2a1a1a;border:1px solid #8b0000;border-radius:6px;">
+                            <strong style="color:#f87171;">NHL Draft Declarations:</strong>
+                            <div style="font-size:0.85em;margin-top:5px;">${s.draftDeclarations.map(d =>
+                                `<div>${esc(d.name)} <span style="color:#aaa;">(${esc(d.team)}, ${d.year}, OVR ${d.overall})</span> — left early</div>`
+                            ).join('')}</div>
+                        </div>` : ''}
                     </div>
                     <button id="rec-submit" class="primary" style="width:auto;">Submit Points & Advance Week</button>
                 </div>

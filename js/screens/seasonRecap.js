@@ -47,7 +47,7 @@ export function render(container) {
     update(s => { awards = computeSeasonAwards(s); });
     const myAwards = awards.filter(a => a.team === team.name);
     const awardsHTML = awards.length ? awards.map(a =>
-        `<div>${esc(a.name)} <span style="color:#aaa;">(${a.position}, ${esc(a.team)})</span> — <span style="color:var(--accent);">${esc(a.label)}</span> <span style="color:#4ade80;">+1 OVR</span></div>`
+        `<div>${esc(a.name)} <span style="color:#aaa;">(${a.position}, ${esc(a.team)})</span> — <span style="color:var(--accent);">${esc(a.label)}</span> <span style="color:#888;">${esc(a.stat || '')}</span> <span style="color:#4ade80;">+1 OVR</span></div>`
     ).join('') : '<span style="color:#888;">None</span>';
 
     // Coach of the Year. If the user won, they pick where the +1 skill point goes.

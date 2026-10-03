@@ -5,7 +5,7 @@ import { getState, update } from './store.js';
 import { showScreen } from './router.js';
 import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
 import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
-import { generateProspectPool, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
+import { generateProspectPool, assignPreferences, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
 import { fillVacantSlots } from './lines.js';
 import { conferences } from './data.js';
 
@@ -22,6 +22,7 @@ export function simCurrentWeek() {
             state.prospectPool = generateProspectPool();
             state.recruitTargets = [];
         }
+        assignPreferences(state.prospectPool, state.leagueTeams, state.teamId, state.coach);
         processInseasonWeek(state);
     });
     return { weekIndex, seasonActive };
@@ -55,6 +56,7 @@ export function beginOffseason() {
         // never a prospect they showed interest in.
         if (state.prospectPool && state.prospectPool.length) applyPoolTurnover(state.prospectPool);
         else state.prospectPool = generateProspectPool();
+        assignPreferences(state.prospectPool, state.leagueTeams, state.teamId, state.coach);
         state.recruitTargets = [];
         state.seasonResolution = null;
     });
