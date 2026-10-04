@@ -1,39 +1,49 @@
 // screens/schedule.js — the user's full season schedule.
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
-import { esc, scheduleLabel } from '../ui.js';
+import { esc } from '../ui.js';
 
 export function render(container) {
     const s = getState();
     const team = getUserTeam();
 
-    const rows = s.schedule.map((weekGames, idx) => {
+    const rows = [];
+    let lastSection = '';
+    s.schedule.forEach((weekGames, idx) => {
+        const weekNum = idx + 1;
+        const section = weekNum <= 10 ? 'Non-Conference' : weekNum <= 38 ? 'Conference' : 'Postseason';
+        const num = weekNum <= 10 ? weekNum : weekNum <= 38 ? weekNum - 10 : weekNum - 38;
+        if (section !== lastSection) {
+            rows.push(`<div style="padding:12px 10px 4px;color:#888;font-size:0.78em;font-weight:bold;letter-spacing:1.5px;">${section.toUpperCase()}</div>`);
+            lastSection = section;
+        }
         const myGame = (weekGames || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
-        let right;
+        let left, right;
         if (!myGame) {
-            right = '<span style="color:#888;">BYE WEEK</span>';
+            left = `<span style="color:#555;font-size:0.85em;width:22px;">${num}</span><span style="color:#555;font-size:0.85em;">Bye week</span>`;
+            right = '';
         } else {
             const isHome = myGame.homeTeamId === team.id;
             const opp = s.leagueTeams.find(t => t.id === (isHome ? myGame.awayTeamId : myGame.homeTeamId));
-            const matchText = `${isHome ? 'vs.' : '@'} ${esc(opp.name)}`;
+            left = `<span style="color:#888;font-size:0.85em;width:22px;flex-shrink:0;">${num}</span><span>${isHome ? 'vs' : '@'} ${esc(opp ? opp.name : '')}</span>`;
             if (myGame.played) {
                 const myScore = isHome ? myGame.homeScore : myGame.awayScore;
                 const oppScore = isHome ? myGame.awayScore : myGame.homeScore;
-                let result = myScore > oppScore ? '<span style="color:#4ade80;">W</span>' : '<span style="color:#f87171;">L</span>';
-                if (myGame.ot) result += ' (OT)';
-                right = `<span>${matchText}</span> <span>${result} ${myScore} - ${oppScore}</span>`;
+                const won = myScore > oppScore;
+                right = `<span style="color:${won ? '#4ade80' : '#f87171'};font-weight:bold;white-space:nowrap;">${won ? 'W' : 'L'}${myGame.ot ? ' (OT)' : ''} ${myScore}–${oppScore}</span>`;
             } else {
-                right = `<span>${matchText}</span> <span>--</span>`;
+                right = `<span style="color:#555;">—</span>`;
             }
         }
-        return `<div style="padding:10px;border-bottom:1px solid #444;display:flex;justify-content:space-between;"><strong>${esc(scheduleLabel(idx + 1))}</strong>${right}</div>`;
-    }).join('');
+        rows.push(`<div style="padding:8px 10px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="display:flex;gap:8px;align-items:center;min-width:0;">${left}</div><div>${right}</div></div>`);
+    });
+    const rowsHtml = rows.join('');
 
     container.innerHTML = `
         <div class="dashboard-panel">
             <h2>Team Schedule</h2>
             <button id="sched-back" class="secondary" style="margin-bottom:15px;">Back to Dashboard</button>
-            <div style="background:#222;padding:15px;border-radius:8px;">${rows}</div>
+            <div style="background:#222;padding:15px;border-radius:8px;">${rowsHtml}</div>
         </div>`;
 
     container.querySelector('#sched-back').onclick = () => showScreen('dashboard');
