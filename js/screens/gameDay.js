@@ -222,8 +222,8 @@ export function render(container, params) {
     const eventRow = (e, i, animate) => {
         const t = e.teamId === home.id ? home : away;
         const anim = animate ? `animation-delay:${(i * 0.45).toFixed(2)}s;` : 'animation:none;';
-        const badge = `<span style="background:${t.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;">${esc(t.abbr)}</span>`;
-        const score = `<span style="font-weight:bold;white-space:nowrap;">${e.awayScore} – ${e.homeScore}</span>`;
+        const badge = `<span style="background:${t.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;min-width:42px;text-align:center;display:inline-block;">${esc(t.abbr)}</span>`;
+        const score = `<span style="font-weight:bold;white-space:nowrap;min-width:52px;text-align:right;">${e.awayScore} – ${e.homeScore}</span>`;
         if (e.kind === 'penalty') {
             return `<div class="event-row" style="${anim}">
                 <span style="color:#888;min-width:44px;">${fmtTime(e)}</span>${badge}
