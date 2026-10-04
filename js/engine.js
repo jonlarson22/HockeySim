@@ -172,9 +172,12 @@ export function enforceRosterLimits(roster) {
         goalies: active.goalies.splice(ACTIVE_GOALIES)
     };
 
-    // Move excess to practice squad
+    // Move excess to practice squad (vacating their slots)
     [...excess.forwards, ...excess.defensemen, ...excess.goalies].forEach(p => {
         p.status = 'Practice Squad';
+        p.lineSlot = null;
+        p.pairSlot = null;
+        p.tempFill = false;
     });
 }
 

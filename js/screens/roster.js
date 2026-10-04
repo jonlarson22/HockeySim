@@ -142,6 +142,13 @@ export function render(container) {
                     const player = findPlayer(t, playerId);
                     if (player) {
                         player.status = e.target.value;
+                        // Benched: vacate line/pair slot so it shows as vacant.
+                        // (Injury keeps the slot as "home" — this is manual only.)
+                        if (e.target.value !== 'Active Roster' && player.injuryWeeks === 0) {
+                            player.lineSlot = null;
+                            player.pairSlot = null;
+                            player.tempFill = false;
+                        }
                         enforceRosterLimits(t.roster);
                     }
                 });
@@ -185,11 +192,11 @@ function paintLines(container, team, backToRoster) {
             const chemSign = chem > 0 ? '+' : '';
             const chemTxt = chemSign + (chem * 100).toFixed(0) + '%';
             const card = (p, slot) => {
-                if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;min-height:76px;display:flex;align-items:center;justify-content:center;">- ' + slot + ' (vacant) -</div>';
+                if (!p) return '<div data-slot="' + slot + '" data-kind="fwd-vacant" class="line-player" style="padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;min-height:76px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px dashed #555;">- ' + slot + ' (vacant) -</div>';
                 const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
                 const inj = p.injuryWeeks > 0 ? ' <span style="color:#f87171;">(INJ)</span>' : '';
                 const oop = p.linePos !== slot ? ' <span style="color:#fbbf24;" title="Out of position">!</span>' : '';
-                return '<div data-pid="' + p.id + '" data-kind="fwd" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;min-height:76px;' + sel + '">' +
+                return '<div data-pid="' + p.id + '" data-kind="fwd" class="line-player" style="padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;min-height:76px;' + sel + '">' +
                     '<div style="font-size:0.75em;color:#888;">' + slot + '</div>' +
                     '<div><strong>' + esc(p.firstName) + ' ' + esc(p.lastName) + '</strong>' + inj + oop + '</div>' +
                     '<div style="font-size:0.8em;color:#aaa;">' + (p.linePos || '?') + ' - ' + getRole(p) + ' - OVR ' + p.overall + '</div>' +
@@ -200,7 +207,7 @@ function paintLines(container, team, backToRoster) {
                 '<strong>Line ' + l + '</strong>' +
                 '<span style="font-size:0.9em;">Eff OVR <strong>' + eff.toFixed(1) + '</strong> <span style="color:' + chemColor + ';">(' + chemTxt + ' chem)</span></span>' +
                 '</div>' +
-                '<div style="display:flex;gap:8px;">' + card(LW, 'LW') + card(C, 'C') + card(RW, 'RW') + '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">' + card(LW, 'LW') + card(C, 'C') + card(RW, 'RW') + '</div>' +
                 '</div>';
         }).join('');
 
@@ -209,11 +216,11 @@ function paintLines(container, team, backToRoster) {
 
         // Defensive pairs, click-to-swap like the forward lines.
         const dPairs = getDPairs(team.roster.defensemen.filter(d => d.status === 'Active Roster' && !d.injuryWeeks));
-        const dCard = (p) => {
-            if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;min-height:64px;display:flex;align-items:center;justify-content:center;">- vacant -</div>';
+        const dCard = (p, slot) => {
+            if (!p) return '<div data-slot="' + slot + '" data-kind="def-vacant" class="line-player" style="padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;min-height:64px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px dashed #555;">- vacant -</div>';
             const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
             const inj = p.injuryWeeks > 0 ? ' <span style="color:#f87171;">(INJ)</span>' : '';
-            return '<div data-pid="' + p.id + '" data-kind="def" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;min-height:64px;' + sel + '">' +
+            return '<div data-pid="' + p.id + '" data-kind="def" class="line-player" style="padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;min-height:64px;' + sel + '">' +
                 '<div><strong>' + esc(p.firstName) + ' ' + esc(p.lastName) + '</strong>' + inj + '</div>' +
                 '<div style="font-size:0.8em;color:#aaa;">' + getRole(p) + ' - OVR ' + p.overall + '</div>' +
                 '</div>';
@@ -231,12 +238,12 @@ function paintLines(container, team, backToRoster) {
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
                 '<strong>Pair ' + pn + '</strong>' +
                 '<span style="font-size:0.9em;color:#888;">' + ovrTxt + '</span></div>' +
-                '<div style="display:flex;gap:8px;">' + dCard(pr.A) + dCard(pr.B) + '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + dCard(pr.A, 'D' + pn + 'A') + dCard(pr.B, 'D' + pn + 'B') + '</div>' +
                 '</div>';
         }).join('');
         const dReserves = team.roster.defensemen.filter(d => !d.pairSlot && d.status === 'Active Roster');
         if (dReserves.length) {
-            dHtml += '<div style="color:#888;font-size:0.85em;margin-bottom:10px;">Extra defensemen (click to swap into a pair):</div>';
+            dHtml += '<div style="color:#888;font-size:0.85em;margin-bottom:10px;">Unassigned Defensemen (click, then click a pair spot):</div>';
             dReserves.forEach(p => {
                 const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
                 dHtml += '<div data-pid="' + p.id + '" data-kind="def" class="line-player" style="padding:8px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;cursor:pointer;' + sel + '">' +
@@ -262,7 +269,7 @@ function paintLines(container, team, backToRoster) {
                 '</div>';
         });
         if (reserves.length) {
-            resHtml = '<h3 style="margin-top:15px;">Reserves (click to swap into a line)</h3>';
+            resHtml = '<h3 style="margin-top:15px;">Unassigned Forwards (click, then click a line spot)</h3>';
             reserves.forEach(p => {
                 const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
                 resHtml += '<div data-pid="' + p.id + '" data-kind="fwd" class="line-player" style="padding:8px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;cursor:pointer;' + sel + '">' +
@@ -275,7 +282,7 @@ function paintLines(container, team, backToRoster) {
         container.innerHTML =
             '<div class="dashboard-panel">' +
             '<h2>Lines & Goalie</h2>' +
-            '<p style="color:#888;font-size:0.9em;">Click two skaters to swap them. Chemistry adjusts each forward line\'s effective OVR (+/-5%). Click a goalie to name the starter.</p>' +
+            '<p style="color:#888;font-size:0.9em;">Click two skaters to swap them. Click an unassigned player, then a vacant (dashed) spot to assign them. Chemistry adjusts lines (+/-5%). Click a goalie to name the starter.</p>' +
             '<div style="margin-bottom:15px;"><button id="lines-back" class="secondary">Back to Roster</button></div>' +
             linesHtml + dHtml + gHtml + resHtml +
             '</div>';
@@ -285,12 +292,30 @@ function paintLines(container, team, backToRoster) {
             el.onclick = () => {
                 const pid = el.dataset.pid;
                 const kind = el.dataset.kind || 'fwd';
+                const slot = el.dataset.slot;
                 if (kind === 'goalie') {
                     const team = getUserTeam();
                     const g = team.roster.goalies.find(x => x.id === pid);
                     if (g && g.status === 'Redshirt') return; // redshirts can't start
                     update(st => {
                         st.leagueTeams.find(x => x.id === st.teamId).starterGoalieId = pid;
+                    });
+                    selectedId = null; selectedKind = null;
+                    renderLines();
+                    return;
+                }
+                // Vacant slot: assign the selected unassigned player here.
+                if (kind === 'fwd-vacant' || kind === 'def-vacant') {
+                    if (!selectedId) return;
+                    const wantKind = kind === 'fwd-vacant' ? 'fwd' : 'def';
+                    if (selectedKind !== wantKind) return;
+                    update(st => {
+                        const t = st.leagueTeams.find(x => x.id === st.teamId);
+                        const a = findPlayer(t, selectedId);
+                        if (a) {
+                            if (wantKind === 'def') a.pairSlot = slot;
+                            else a.lineSlot = slot;
+                        }
                     });
                     selectedId = null; selectedKind = null;
                     renderLines();
