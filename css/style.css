@@ -280,6 +280,12 @@ li {
     .roster-row .role-select {
         flex-shrink: 0;
     }
+    .skill-row {
+        gap: 8px;
+    }
+    .skill-controls {
+        gap: 8px;
+    }
 }
 
 /* Make recap and bracket screens wider */
