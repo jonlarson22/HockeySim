@@ -11,7 +11,8 @@ export function render(container) {
             const saved = info && info.savedAt ? new Date(info.savedAt).toLocaleDateString() : '';
             const body = info ? `
                 <div><strong>${esc(info.coachName)}</strong></div>
-                <div style="color:#aaa;font-size:0.9em;">${esc(info.teamName)} · Year ${info.year}, Game ${info.week}</div>
+                <div style="color:#aaa;font-size:0.9em;">${esc(info.teamName)}</div>
+                <div style="color:#aaa;font-size:0.9em;">Year ${info.year}, Game ${info.week}</div>
                 <div style="color:#666;font-size:0.8em;">${saved ? 'Saved ' + esc(saved) : ''}</div>
                 <div style="margin-top:8px;display:flex;gap:6px;">
                     <button data-load="${slot}">Load</button>
