@@ -9,7 +9,7 @@ export function render(container) {
     const s = getState();
     // First jobs come from below-average programs — you earn your way up.
     const jobs = s.leagueTeams
-        .filter(t => t.prestige < 49)
+        .filter(t => t.prestige <= 39)
         .sort(() => 0.5 - Math.random())
         .slice(0, Math.floor(Math.random() * 2) + 2);
 
