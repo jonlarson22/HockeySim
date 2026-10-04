@@ -13,6 +13,7 @@ export function render(container) {
     // Filter toggles are UI-only state; they reset if you leave and come back.
     let targetsOnly = false;
     let posFilter = 'ALL';
+    let sortKey = 'OVR';
 
     const paint = () => {
         const s = getState();
@@ -34,6 +35,12 @@ export function render(container) {
             if (posFilter !== 'ALL' && p.position !== posFilter) return false;
             return true;
         });
+        const sorters = {
+            OVR: (a, b) => b.overall - a.overall,
+            POT: (a, b) => b.potential - a.potential,
+            INT: (a, b) => (b.userPoints || 0) - (a.userPoints || 0),
+        };
+        visible.sort(sorters[sortKey] || sorters.OVR);
 
         const cards = visible.map(p => {
             const myAlloc = alloc[p.id] || 0;
@@ -78,7 +85,7 @@ export function render(container) {
                     </div>
                     <button id="rec-submit" class="primary" style="width:auto;">Submit Points & Advance Week</button>
                 </div>
-                <div style="display:flex;gap:10px;margin-bottom:15px;">
+                <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
                     <button id="rec-targets" class="secondary" style="width:auto;padding:6px 12px;${targetsOnly ? 'background:#444;' : ''}">My Targets Only</button>
                     <button id="rec-all" class="secondary" style="width:auto;padding:6px 12px;${!targetsOnly ? 'background:#444;' : ''}">All Prospects</button>
                     <select id="rec-pos" class="input-field" style="width:auto;padding:6px;">
@@ -86,6 +93,11 @@ export function render(container) {
                         <option value="F" ${posFilter === 'F' ? 'selected' : ''}>Forwards</option>
                         <option value="D" ${posFilter === 'D' ? 'selected' : ''}>Defensemen</option>
                         <option value="G" ${posFilter === 'G' ? 'selected' : ''}>Goalies</option>
+                    </select>
+                    <select id="rec-sort" class="input-field" style="width:auto;padding:6px;">
+                        <option value="OVR" ${sortKey === 'OVR' ? 'selected' : ''}>Sort: OVR</option>
+                        <option value="POT" ${sortKey === 'POT' ? 'selected' : ''}>Sort: Potential</option>
+                        <option value="INT" ${sortKey === 'INT' ? 'selected' : ''}>Sort: Interest</option>
                     </select>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:10px;max-height:550px;overflow-y:auto;">
@@ -96,6 +108,7 @@ export function render(container) {
         container.querySelector('#rec-targets').onclick = () => { targetsOnly = true; paint(); };
         container.querySelector('#rec-all').onclick = () => { targetsOnly = false; paint(); };
         container.querySelector('#rec-pos').onchange = e => { posFilter = e.target.value; paint(); };
+        container.querySelector('#rec-sort').onchange = e => { sortKey = e.target.value; paint(); };
 
         const setAlloc = (id, value) => {
             update(st => {

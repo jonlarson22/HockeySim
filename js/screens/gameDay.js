@@ -234,7 +234,7 @@ export function render(container, params) {
         }
         const assists = e.assists.length
             ? `<div style="color:#888;font-size:0.85em;">${e.assists.map(esc).join(', ')}</div>` : '';
-        const pp = e.isPP ? ' <span style="color:#fbbf24;font-size:0.75em;font-weight:bold;">PP</span>' : '';
+        const pp = e.isPP ? ' <span style="color:#fbbf24;font-size:0.75em;font-weight:bold;">PP</span>' : e.isSH ? ' <span style="color:#f87171;font-size:0.75em;font-weight:bold;">SH</span>' : '';
         return `<div class="event-row" style="${anim}">
             <span style="color:#888;min-width:44px;">${fmtTime(e)}</span>${badge}
             <span style="flex:1;"><strong>${esc(e.scorer)}</strong>${pp}${assists}</span>${score}
@@ -274,16 +274,49 @@ export function render(container, params) {
             add(e.scorerId, e.scorer, e.teamId, true);
             (e.assistIds || []).forEach((aid, i) => add(aid, (e.assists || [])[i] || '', e.teamId, false));
         }
-        const ranked = [...tally.values()]
-            .map(r => ({ ...r, pts: r.g + r.a }))
-            .filter(r => r.pts > 0)
-            .sort((a, b) => b.pts - a.pts || b.g - a.g)
+        // Game +/- from even-strength and shorthanded goals (power-play goals excluded).
+        const pm = new Map();
+        const activeSkaters = team => [
+            ...(team.roster.forwards || []), ...(team.roster.defensemen || [])
+        ].filter(p => p.status === 'Active Roster' && !p.injuryWeeks);
+        for (const e of events) {
+            if (e.kind === 'penalty' || e.isPP || !e.scorerId || e.scorerId === 'none') continue;
+            const scored = e.teamId === home.id ? home : away;
+            const conceded = scored === home ? away : home;
+            for (const p of activeSkaters(scored)) pm.set(p.id, (pm.get(p.id) || 0) + 1);
+            for (const p of activeSkaters(conceded)) pm.set(p.id, (pm.get(p.id) || 0) - 1);
+        }
+        const candidates = [];
+        for (const [id, r] of tally) {
+            const plusMinus = pm.get(id) || 0;
+            candidates.push({ ...r, plusMinus, score: (r.g + r.a) * 2 + Math.max(0, plusMinus), kind: 'skater' });
+        }
+        // Hot goalie: 30+ saves earns a star candidacy.
+        if (game.shots) {
+            const tot = a => (a || []).reduce((x, y) => x + y, 0);
+            for (const [team, savesArr] of [[home, game.shots.saves.home], [away, game.shots.saves.away]]) {
+                const saves = tot(savesArr);
+                if (saves >= 30) {
+                    const goalie = (team.roster.goalies || []).find(g => g.id === team.starterGoalieId)
+                        || (team.roster.goalies || []).find(g => g.status === 'Active Roster' && !g.injuryWeeks);
+                    if (goalie) {
+                        candidates.push({
+                            name: `${goalie.firstName} ${goalie.lastName}`, teamId: team.id,
+                            g: 0, a: 0, plusMinus: 0, score: saves - 25, kind: 'goalie', saves
+                        });
+                    }
+                }
+            }
+        }
+        const ranked = candidates
+            .filter(r => r.score > 0)
+            .sort((a, b) => b.score - a.score || b.g - a.g)
             .slice(0, 3);
         if (!ranked.length) return '';
         const labels = ['1st Star', '2nd Star', '3rd Star'];
         const rows = ranked.map((r, i) => {
             const t = r.teamId === home.id ? home : away;
-            const line = `${r.g}G ${r.a}A`;
+            const line = r.kind === 'goalie' ? `${r.saves} saves` : `${r.g}G ${r.a}A${r.plusMinus !== 0 ? ` (${r.plusMinus > 0 ? '+' : ''}${r.plusMinus})` : ''}`;
             return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #333;">
                 <span><span style="color:#fbbf24;">★</span> <strong>${labels[i]}</strong>: ${esc(r.name)} <span style="color:#888;font-size:0.85em;">(${esc(t.abbr)})</span></span>
                 <span style="color:#888;">${line}</span>

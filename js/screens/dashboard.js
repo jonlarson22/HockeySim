@@ -43,6 +43,7 @@ export function render(container) {
                     <h2>Next Game</h2>
                     <p style="margin-bottom: 15px; color: #aaa;">${esc(nextText)}</p>
                     <button id="dash-sim" class="primary" style="width: 100%; margin-bottom: 10px;">Simulate Week</button>
+                    ${s.pendingRecruitWindow ? `<button id="dash-recruit-window" class="primary" style="width: 100%; margin-bottom: 10px; background: #4ade80; color: #000;">🎯 Recruiting Window (Week ${s.pendingRecruitWindow})</button>` : ''}
                     <button id="dash-schedule" class="secondary" style="width: 100%;">Team Schedule</button>
                 </div>
                 <div class="dashboard-panel">
@@ -129,6 +130,9 @@ export function render(container) {
         const { weekIndex, seasonActive } = simCurrentWeek();
         goAfterSimWeek(weekIndex, seasonActive);
     };
+
+    const rwBtn = container.querySelector('#dash-recruit-window');
+    if (rwBtn) rwBtn.onclick = () => showScreen('recruit-window');
 
     container.querySelector('#dash-schedule').onclick = () => showScreen('schedule');
     container.querySelector('#dash-roster').onclick = () => showScreen('roster');

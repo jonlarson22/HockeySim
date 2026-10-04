@@ -16,6 +16,8 @@ export function simCurrentWeek() {
     const weekIndex = getState().currentWeek - 1;
     let seasonActive = false;
     update(state => {
+        // Any unopened recruiting window expires when the next week sims.
+        state.pendingRecruitWindow = null;
         seasonActive = simulateWeek(state);
         // In-season recruiting background: lazy pool for migrated saves,
         // then the target-board drip + phantom rival creep.
@@ -25,22 +27,23 @@ export function simCurrentWeek() {
         }
         assignPreferences(state.prospectPool, state.leagueTeams, state.teamId, state.coach);
         processInseasonWeek(state);
+        // Recruiting windows (weeks 10/22/34) wait on the dashboard banner —
+        // the user watches their game and sets redshirts first, then opens it.
+        if (INSEASON_WINDOW_WEEKS.includes(weekIndex + 1)) {
+            state.pendingRecruitWindow = weekIndex + 1;
+        }
     });
     return { weekIndex, seasonActive };
 }
 
-// Routes after a sim: season recap when the year is done, the recruiting
-// window when one opens, the game-day replay when the user's team played,
-// otherwise the weekly recap.
+// Routes after a sim: season recap when the year is done, the game-day replay
+// when the user's team played, otherwise the weekly recap. (Recruiting windows
+// no longer interrupt — they wait on the dashboard banner.)
 export function goAfterSimWeek(weekIndex, seasonActive) {
     const s = getState();
     const team = s.leagueTeams.find(t => t.id === s.teamId);
     if (!seasonActive) { showScreen('season-recap'); return; }
     const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
-    if (INSEASON_WINDOW_WEEKS.includes(weekIndex + 1)) {
-        showScreen('recruit-window', { weekIndex, confId: team.confId, hadGame: !!(myGame && myGame.events) });
-        return;
-    }
     if (myGame && myGame.events) showScreen('game-day', { weekIndex, confId: team.confId });
     else showScreen('weekly-recap', { weekIndex, confId: team.confId });
 }
@@ -187,6 +190,7 @@ export function submitRecruitWindow() {
         const res = processRecruitWindow(state, state.recruitWeekAlloc || {});
         touched = res.touched;
         state.recruitWeekAlloc = {};
+        state.pendingRecruitWindow = null;
     });
     return { touched };
 }
@@ -213,7 +217,7 @@ export function toggleRecruitTarget(prospectId) {
         if (!p || p.signedBy) { result = 'invalid'; return; }
         const targets = state.recruitTargets || (state.recruitTargets = []);
         const idx = targets.indexOf(prospectId);
-        if (idx >= 0) { targets.splice(idx, 1); result = 'removed'; }
+        if (idx >= 0) { targets.splice(idx, 1); p.isUserTarget = false; result = 'removed'; }
         else if (targets.length >= MAX_RECRUIT_TARGETS) { result = 'full'; }
         else { targets.push(prospectId); p.isUserTarget = true; result = 'added'; }
     });

@@ -526,6 +526,21 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
             takePenalty(oppTeam, oppSkaters, g.period, Math.floor(pt / 60), pt % 60);
         }
     }
+    // Shorthanded goals: ~6% of non-PP regulation goals. The scoring team was
+    // killing a penalty, so ensure a preceding penalty on THEIR side too.
+    // SH goals count for +/- (only PP goals are excluded).
+    for (const g of events.filter(e => !e.isPP && e.period < 4 && Math.random() < 0.06)) {
+        const ownTeam = g.teamId === homeTeam.id ? homeTeam : awayTeam;
+        const ownSkaters = g.teamId === homeTeam.id ? homeSkaters : awaySkaters;
+        const gt = g.minute * 60 + g.second;
+        const hasCause = penalties.some(p => p.teamId === ownTeam.id && p.period === g.period &&
+            (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) <= 300);
+        if (!hasCause) {
+            const pt = Math.max(0, gt - (60 + Math.floor(Math.random() * 180)));
+            takePenalty(ownTeam, ownSkaters, g.period, Math.floor(pt / 60), pt % 60);
+        }
+        g.isSH = true;
+    }
 
     // Chronological order, then attach the running score to each event
     // (penalties don't change the score).
