@@ -2,6 +2,7 @@
 import { getState, getUserTeam } from '../store.js';
 import { showScreen } from '../router.js';
 import { esc } from '../ui.js';
+import { nationalRank } from '../engine.js';
 
 export function render(container) {
     const s = getState();
@@ -25,7 +26,13 @@ export function render(container) {
         } else {
             const isHome = myGame.homeTeamId === team.id;
             const opp = s.leagueTeams.find(t => t.id === (isHome ? myGame.awayTeamId : myGame.homeTeamId));
-            left = `<span style="color:#888;font-size:0.85em;width:22px;flex-shrink:0;">${num}</span><span>${isHome ? 'vs' : '@'} ${esc(opp ? opp.name : '')}</span>`;
+            // Played games show the rank stamped at game time; upcoming games
+            // show the opponent's current rank.
+            const oppRank = myGame.played
+                ? (isHome ? myGame.awayRank : myGame.homeRank)
+                : (opp ? nationalRank(s.leagueTeams, opp.id, s.schedule) : 99);
+            const rankTxt = oppRank && oppRank <= 25 ? ` #${oppRank}` : '';
+            left = `<span style="color:#888;font-size:0.85em;width:22px;flex-shrink:0;">${num}</span><span>${isHome ? 'vs' : '@'}${rankTxt} ${esc(opp ? opp.name : '')}</span>`;
             if (myGame.played) {
                 const myScore = isHome ? myGame.homeScore : myGame.awayScore;
                 const oppScore = isHome ? myGame.awayScore : myGame.homeScore;

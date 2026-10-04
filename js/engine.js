@@ -588,8 +588,16 @@ export function simulateWeek(gameState) {
 
     const weekGames = gameState.schedule[currentWeekIndex];
 
+    // Snapshot the poll before the week's games: each game is stamped with
+    // both teams' ranks going in, so the schedule can show "vs #5 Michigan"
+    // as it was on game day.
+    const rankOf = new Map(gameState.leagueTeams.map(t => [t.id, nationalRank(gameState.leagueTeams, t.id, gameState.schedule)]));
+
     weekGames.forEach(game => {
         if (game.played) return;
+
+        game.homeRank = rankOf.get(game.homeTeamId);
+        game.awayRank = rankOf.get(game.awayTeamId);
 
         const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
         const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
