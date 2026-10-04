@@ -43,6 +43,7 @@ export function render(container) {
                     <h2>Next Game</h2>
                     <p style="margin-bottom: 15px; color: #aaa;">${esc(nextText)}</p>
                     <button id="dash-sim" class="primary" style="width: 100%; margin-bottom: 10px;">Simulate Week</button>
+                    ${s.currentWeek === 10 ? `<div style="background:#3a2e1a;border:1px solid #fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:0.85em;color:#fbbf24;">⚠️ Redshirt deadline: setting redshirts locks after this week's game. Redshirts develop slowly without using an eligibility year.</div>` : ''}
                     ${s.pendingRecruitWindow ? `<button id="dash-recruit-window" class="primary" style="width: 100%; margin-bottom: 10px; background: #4ade80; color: #000;">🎯 Recruiting Window (Week ${s.pendingRecruitWindow})</button>` : ''}
                     <button id="dash-schedule" class="secondary" style="width: 100%;">Team Schedule</button>
                 </div>

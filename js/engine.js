@@ -3,7 +3,7 @@ import { getRandomFirstName, getRandomLastName, conferences, teams as baseTeams 
 // Designed league-average prestige (the 25–90 spread's center). The offseason
 // peg recenters on this so the league mean can't inflate over the decades.
 const DESIGN_MEAN = baseTeams.reduce((a, t) => a + t.prestige, 0) / baseTeams.length;
-import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole, autoFormDPairs, getDPairs } from './lines.js';
+import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole, autoFormDPairs, getDPairs, dPairEffectiveOvr } from './lines.js';
 
 import { 
     generateConferenceQuarterfinals, 
@@ -364,11 +364,12 @@ export function calculateTeamRatings(teamId, gameState) {
     const hasPairSlots = [1, 2, 3].some(p => dPairs[p].A || dPairs[p].B);
     if (hasPairSlots) {
         // User-arranged pairs: pair 1 gets 40%, pair 2 gets 35%, pair 3 gets 25%.
+        // Each pair's effective OVR includes its chemistry bonus (±5%).
         const dw = [0.40, 0.35, 0.25];
         let dwSum = 0;
         for (let p = 1; p <= 3; p++) {
             const { A, B } = dPairs[p];
-            if (A && B) { defOvr += ((A.overall + B.overall) / 2) * dw[p - 1]; dwSum += dw[p - 1]; }
+            if (A && B) { defOvr += dPairEffectiveOvr(A, B) * dw[p - 1]; dwSum += dw[p - 1]; }
             else if (A || B) { defOvr += (A || B).overall * dw[p - 1]; dwSum += dw[p - 1]; }
         }
         defOvr = dwSum > 0 ? defOvr / dwSum

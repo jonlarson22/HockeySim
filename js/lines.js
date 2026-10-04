@@ -103,6 +103,30 @@ export function lineChemistry(c, lw, rw) {
     return Math.max(-0.05, Math.min(0.05, bonus));
 }
 
+// Chemistry bonus (-0.05 to +0.05) for a defense pair.
+// Classic complementary pair: a defensive anchor (Two-Way / Power Forward)
+// with a puck-mover (Playmaker / Speedster). Same role or two pure
+// offense types without defensive conscience: redundant.
+export function dPairChemistry(a, b) {
+    if (!a || !b) return 0;
+    let bonus = 0;
+    const ra = getRole(a), rb = getRole(b);
+    const anchor = r => r === 'Two-Way' || r === 'Power Forward';
+    const mover = r => r === 'Playmaker' || r === 'Speedster' || r === 'Scorer';
+    if ((anchor(ra) && mover(rb)) || (anchor(rb) && mover(ra))) bonus += 0.02;
+    if (ra === rb) bonus -= 0.01;
+    if (mover(ra) && mover(rb) && !anchor(ra) && !anchor(rb)) bonus -= 0.01;
+    return Math.max(-0.05, Math.min(0.05, bonus));
+}
+
+// Effective OVR for a D pair (average OVR × chemistry).
+export function dPairEffectiveOvr(a, b) {
+    const pair = [a, b].filter(Boolean);
+    if (!pair.length) return 0;
+    const avg = pair.reduce((s, p) => s + (p.overall || 0), 0) / pair.length;
+    return avg * (1 + dPairChemistry(a, b));
+}
+
 // Effective OVR for a line (average OVR × chemistry).
 export function lineEffectiveOvr(c, lw, rw) {
     const line = [c, lw, rw].filter(Boolean);

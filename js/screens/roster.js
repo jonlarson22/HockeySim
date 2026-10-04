@@ -3,7 +3,7 @@ import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { enforceRosterLimits } from '../engine.js';
 import { releasePlayer } from '../actions.js';
-import { getLines, lineChemistry, lineEffectiveOvr, getRole, getDPairs, fillVacantDPairSlots } from '../lines.js';
+import { getLines, lineChemistry, lineEffectiveOvr, getRole, getDPairs, fillVacantDPairSlots, dPairChemistry, dPairEffectiveOvr } from '../lines.js';
 import { esc, openModal, closeModal } from '../ui.js';
 
 const YEAR_VAL = { Fr: 1, So: 2, Jr: 3, Sr: 4 };
@@ -98,9 +98,9 @@ export function render(container) {
             <div class="dashboard-panel">
                 <h2>Team Roster</h2>
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:15px;">
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <button id="roster-back" class="secondary" style="margin:0;">Back to Dashboard</button>
-                        <button id="view-lines" class="secondary" style="margin:0;">Lines</button>
+                    <div style="display:flex;gap:8px;align-items:stretch;">
+                        <button id="roster-back" class="secondary" style="margin:0;white-space:nowrap;padding:8px 16px;">Back to Dashboard</button>
+                        <button id="view-lines" class="secondary" style="margin:0;white-space:nowrap;padding:8px 16px;">Lines</button>
                     </div>
                     <div>
                         <label for="roster-sort">Sort By: </label>
@@ -170,7 +170,7 @@ function paintLines(container, team, backToRoster) {
             fillVacantDPairSlots(st.leagueTeams.find(x => x.id === st.teamId).roster.defensemen);
         });
     }
-    const forwards = team.roster.forwards;
+    const forwards = team.roster.forwards.filter(p => p.status === 'Active Roster' && !p.injuryWeeks);
     const lines = getLines(forwards);
     let selectedId = null;
     let selectedKind = null;
@@ -185,11 +185,11 @@ function paintLines(container, team, backToRoster) {
             const chemSign = chem > 0 ? '+' : '';
             const chemTxt = chemSign + (chem * 100).toFixed(0) + '%';
             const card = (p, slot) => {
-                if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;">- ' + slot + ' (vacant) -</div>';
+                if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;min-height:76px;display:flex;align-items:center;justify-content:center;">- ' + slot + ' (vacant) -</div>';
                 const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
                 const inj = p.injuryWeeks > 0 ? ' <span style="color:#f87171;">(INJ)</span>' : '';
                 const oop = p.linePos !== slot ? ' <span style="color:#fbbf24;" title="Out of position">!</span>' : '';
-                return '<div data-pid="' + p.id + '" data-kind="fwd" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;' + sel + '">' +
+                return '<div data-pid="' + p.id + '" data-kind="fwd" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;min-height:76px;' + sel + '">' +
                     '<div style="font-size:0.75em;color:#888;">' + slot + '</div>' +
                     '<div><strong>' + esc(p.firstName) + ' ' + esc(p.lastName) + '</strong>' + inj + oop + '</div>' +
                     '<div style="font-size:0.8em;color:#aaa;">' + (p.linePos || '?') + ' - ' + getRole(p) + ' - OVR ' + p.overall + '</div>' +
@@ -208,12 +208,12 @@ function paintLines(container, team, backToRoster) {
         let resHtml = '';
 
         // Defensive pairs, click-to-swap like the forward lines.
-        const dPairs = getDPairs(team.roster.defensemen.filter(d => d.status === 'Active Roster'));
+        const dPairs = getDPairs(team.roster.defensemen.filter(d => d.status === 'Active Roster' && !d.injuryWeeks));
         const dCard = (p) => {
-            if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;">- vacant -</div>';
+            if (!p) return '<div style="flex:1;padding:10px;background:#1a1a1a;border-radius:4px;text-align:center;color:#666;min-height:64px;display:flex;align-items:center;justify-content:center;">- vacant -</div>';
             const sel = p.id === selectedId ? 'border:2px solid var(--accent);' : 'border:1px solid #444;';
             const inj = p.injuryWeeks > 0 ? ' <span style="color:#f87171;">(INJ)</span>' : '';
-            return '<div data-pid="' + p.id + '" data-kind="def" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;' + sel + '">' +
+            return '<div data-pid="' + p.id + '" data-kind="def" class="line-player" style="flex:1;padding:10px;background:#2a2a2a;border-radius:4px;cursor:pointer;min-height:64px;' + sel + '">' +
                 '<div><strong>' + esc(p.firstName) + ' ' + esc(p.lastName) + '</strong>' + inj + '</div>' +
                 '<div style="font-size:0.8em;color:#aaa;">' + getRole(p) + ' - OVR ' + p.overall + '</div>' +
                 '</div>';
@@ -221,10 +221,16 @@ function paintLines(container, team, backToRoster) {
         let dHtml = '<h3 style="margin-top:20px;">Defensive Pairs</h3>';
         dHtml += [1, 2, 3].map(pn => {
             const pr = dPairs[pn] || {};
-            const ovr = pr.A && pr.B ? ((pr.A.overall + pr.B.overall) / 2).toFixed(1)
-                : pr.A || pr.B ? (pr.A || pr.B).overall : '—';
+            const chem = dPairChemistry(pr.A, pr.B);
+            const eff = dPairEffectiveOvr(pr.A, pr.B);
+            const chemColor = chem > 0 ? '#4ade80' : chem < 0 ? '#f87171' : '#888';
+            const chemSign = chem > 0 ? '+' : '';
+            const chemTxt = chemSign + (chem * 100).toFixed(0) + '%';
+            const ovrTxt = pr.A || pr.B ? `Eff OVR <strong>${eff.toFixed(1)}</strong> <span style="color:${chemColor};">(${chemTxt} chem)</span>` : '—';
             return '<div style="margin-bottom:12px;background:#1e1e1e;border-radius:6px;padding:10px;">' +
-                '<div style="margin-bottom:8px;"><strong>Pair ' + pn + '</strong> <span style="font-size:0.9em;color:#888;">OVR ' + ovr + '</span></div>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                '<strong>Pair ' + pn + '</strong>' +
+                '<span style="font-size:0.9em;color:#888;">' + ovrTxt + '</span></div>' +
                 '<div style="display:flex;gap:8px;">' + dCard(pr.A) + dCard(pr.B) + '</div>' +
                 '</div>';
         }).join('');
@@ -239,15 +245,18 @@ function paintLines(container, team, backToRoster) {
             });
         }
 
-        // Starting goalie: click to name the starter.
+        // Starting goalie: click to name the starter. Redshirts can't start.
         const goalies = [...team.roster.goalies].sort((a, b) => b.overall - a.overall);
         let gHtml = '<h3 style="margin-top:20px;">Starting Goalie</h3>';
         goalies.forEach(g => {
             const isStarter = g.id === team.starterGoalieId;
+            const isRS = g.status === 'Redshirt';
             const inj = g.injuryWeeks > 0 ? ' <span style="color:#f87171;">(INJ)</span>' : '';
-            gHtml += '<div data-pid="' + g.id + '" data-kind="goalie" class="line-player" style="padding:10px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;cursor:pointer;' +
+            const rsTag = isRS ? ' <span style="color:#fbbf24;font-size:0.8em;">(Redshirt — ineligible)</span>' : '';
+            gHtml += '<div data-pid="' + g.id + '" data-kind="goalie" class="line-player" style="padding:10px;background:#2a2a2a;margin-bottom:5px;border-radius:4px;' +
+                (isRS ? 'opacity:0.55;' : 'cursor:pointer;') +
                 (isStarter ? 'border:2px solid var(--accent);' : 'border:1px solid #444;') + '">' +
-                '<strong>' + esc(g.firstName) + ' ' + esc(g.lastName) + '</strong>' + inj +
+                '<strong>' + esc(g.firstName) + ' ' + esc(g.lastName) + '</strong>' + inj + rsTag +
                 '<span style="font-size:0.85em;color:#aaa;margin-left:8px;">OVR ' + g.overall + '</span>' +
                 (isStarter ? ' <span style="color:var(--accent);font-weight:bold;font-size:0.85em;">STARTER</span>' : '') +
                 '</div>';
@@ -277,6 +286,9 @@ function paintLines(container, team, backToRoster) {
                 const pid = el.dataset.pid;
                 const kind = el.dataset.kind || 'fwd';
                 if (kind === 'goalie') {
+                    const team = getUserTeam();
+                    const g = team.roster.goalies.find(x => x.id === pid);
+                    if (g && g.status === 'Redshirt') return; // redshirts can't start
                     update(st => {
                         st.leagueTeams.find(x => x.id === st.teamId).starterGoalieId = pid;
                     });
