@@ -147,12 +147,19 @@ li {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+    gap: 12px;
+}
+
+.skill-row > span {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .skill-controls {
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-shrink: 0;
 }
 
 /* Override the default button styles for the small + / - buttons */
