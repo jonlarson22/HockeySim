@@ -37,13 +37,13 @@ function pastGames(teamId, weekIndex, s) {
 function formChips(games, teamId) {
     const last5 = games.slice(-5);
     if (!last5.length) return '<span style="color:#666;">—</span>';
-    return last5.map(g => {
+    return `<span style="white-space:nowrap;">${last5.map(g => {
         const mine = g.homeTeamId === teamId ? g.homeScore : g.awayScore;
         const theirs = g.homeTeamId === teamId ? g.awayScore : g.homeScore;
         const r = mine > theirs ? 'W' : (g.ot ? 'O' : 'L');
         const bg = r === 'W' ? '#1d5c2e' : r === 'O' ? '#6b5b1e' : '#5c1d1d';
-        return `<span style="display:inline-block;min-width:22px;text-align:center;background:${bg};border-radius:4px;padding:1px 4px;font-size:0.8em;font-weight:bold;margin-right:3px;">${r}</span>`;
-    }).join('');
+        return `<span style="display:inline-block;min-width:20px;text-align:center;background:${bg};border-radius:4px;padding:1px 3px;font-size:0.78em;font-weight:bold;margin-right:2px;">${r}</span>`;
+    }).join('')}</span>`;
 }
 
 function gfga(games, teamId) {
@@ -200,7 +200,7 @@ export function render(container, params) {
                             <div style="margin-top:6px;">${formChips(hGames, home.id)}</div>
                         </div>
                     </div>
-                    <div style="margin:10px 0 12px;font-size:0.92em;color:#aaa;text-align:center;"><strong style="color:#fff;">Head-to-head:</strong> ${h2hLine}</div>
+                    <div style="margin:10px 0 12px;font-size:0.92em;color:#aaa;text-align:center;"><strong style="color:#fff;">Head-to-head</strong><br>${h2hLine}</div>
                     <table style="width:100%;border-collapse:collapse;font-size:0.95em;">
                         <tr style="color:#888;"><td></td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(away.abbr)}</td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(home.abbr)}</td></tr>
                         ${tapeRow('OVR', ovr(ae), ovr(he))}
@@ -229,7 +229,7 @@ export function render(container, params) {
         if (e.kind === 'penalty') {
             return `<div class="event-row" style="${anim}">
                 <span style="color:#888;min-width:44px;">${fmtTime(e)}</span>${badge}
-                <span style="flex:1;">${esc(e.player)} <span style="color:#fbbf24;font-size:0.85em;">— ${esc(e.infraction)}, ${e.minutes} min</span></span>${score}
+                <span style="flex:1;color:#f87171;"><strong>${esc(e.player)}</strong><div style="font-size:0.85em;">${esc(e.infraction)}, ${e.minutes} min</div></span>
             </div>`;
         }
         const assists = e.assists.length
@@ -248,7 +248,6 @@ export function render(container, params) {
         const perShots = game.shots ? `
             <div style="color:#888;font-size:0.9em;margin:-4px 0 10px;">
                 Shots: ${esc(away.abbr)} ${game.shots.shots.away[p - 1]} – ${game.shots.shots.home[p - 1]} ${esc(home.abbr)}
-                <span style="margin:0 8px;">·</span>Saves: ${game.shots.saves.away[p - 1]} – ${game.shots.saves.home[p - 1]}
             </div>` : '';
         return `<div id="gd-p${p}" style="margin-top:20px;padding-top:14px;border-top:1px solid #333;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -313,13 +312,13 @@ export function render(container, params) {
             .sort((a, b) => b.score - a.score || b.g - a.g)
             .slice(0, 3);
         if (!ranked.length) return '';
-        const labels = ['1st Star', '2nd Star', '3rd Star'];
+        const starIcons = ['★', '★★', '★★★'];
         const rows = ranked.map((r, i) => {
             const t = r.teamId === home.id ? home : away;
             const line = r.kind === 'goalie' ? `${r.saves} saves` : `${r.g}G ${r.a}A${r.plusMinus !== 0 ? ` (${r.plusMinus > 0 ? '+' : ''}${r.plusMinus})` : ''}`;
             return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #333;">
-                <span><span style="color:#fbbf24;">★</span> <strong>${labels[i]}</strong>: ${esc(r.name)} <span style="color:#888;font-size:0.85em;">(${esc(t.abbr)})</span></span>
-                <span style="color:#888;">${line}</span>
+                <span><span style="color:#fbbf24;">${starIcons[i]}</span> ${esc(r.name)} <span style="color:#888;font-size:0.85em;">(${esc(t.abbr)})</span></span>
+                <span style="color:#888;white-space:nowrap;">${line}</span>
             </div>`;
         }).join('');
         return `<div style="margin-top:16px;text-align:left;"><h3 style="margin:0 0 6px;">Three Stars</h3>${rows}</div>`;
@@ -347,23 +346,22 @@ export function render(container, params) {
         } : null;
         const pimA = events.filter(e => e.kind === 'penalty' && e.teamId === away.id).reduce((a, e) => a + (e.minutes || 2), 0);
         const pimH = events.filter(e => e.kind === 'penalty' && e.teamId === home.id).reduce((a, e) => a + (e.minutes || 2), 0);
-        const statLine = (label, a, h) => `
-            <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #333;">
-                <span style="color:#888;">${label}</span>
-                <span><strong>${a}</strong> <span style="color:#666;">–</span> <strong>${h}</strong></span>
-            </div>`;
+        const statRow = (label, a, h) => `
+            <tr style="border-top:1px solid #333;">
+                <td style="padding:5px 8px;color:#888;">${label}</td>
+                <td style="text-align:center;padding:5px 8px;font-weight:bold;">${a}</td>
+                <td style="text-align:center;padding:5px 8px;font-weight:bold;">${h}</td>
+            </tr>`;
         return `<div id="gd-final" style="margin-top:20px;padding-top:14px;border-top:1px solid #333;text-align:center;">
             <p style="color:#888;margin:0;">FINAL${game.ot ? ' (OT)' : ''}</p>
             <h2 style="margin: 12px 0; font-size: 2em;">${scoreLine(game.awayScore, game.homeScore)}</h2>
             <table style="width:100%;border-collapse:collapse;font-size:0.9em;margin:0 auto;max-width:340px;">
                 <tr style="color:#888;"><td></td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(away.abbr)}</td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(home.abbr)}</td></tr>
                 ${perRows}
+                ${sh ? statRow('Shots', sh.sa, sh.sh) : ''}
+                ${sh ? statRow('Saves', sh.va, sh.vh) : ''}
+                ${statRow('PIM', pimA, pimH)}
             </table>
-            <div style="margin-top:14px;text-align:left;max-width:340px;margin-left:auto;margin-right:auto;">
-                ${sh ? statLine('Shots', `${esc(away.abbr)} ${sh.sa}`, `${sh.sh} ${esc(home.abbr)}`) : ''}
-                ${sh ? statLine('Saves', `${esc(away.abbr)} ${sh.va}`, `${sh.vh} ${esc(home.abbr)}`) : ''}
-                ${statLine('Penalty min', `${esc(away.abbr)} ${pimA}`, `${pimH} ${esc(home.abbr)}`)}
-            </div>
             ${starsHtml()}
             <button id="gd-continue" class="primary" style="width:auto;margin-top:16px;">Continue</button>
         </div>`;
