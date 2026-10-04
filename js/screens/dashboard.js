@@ -1,5 +1,5 @@
 // screens/dashboard.js — in-season hub.
-import { getState, getUserTeam, update } from '../store.js';
+import { getState, getUserTeam, update, persist } from '../store.js';
 import { showScreen } from '../router.js';
 import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
 import { pollScore, TRAINING_FOCUSES } from '../engine.js';
@@ -45,7 +45,8 @@ export function render(container) {
                     <button id="dash-sim" class="primary" style="width: 100%; margin-bottom: 10px;">Simulate Week</button>
                     ${s.currentWeek === 10 ? `<div style="background:#3a2e1a;border:1px solid #fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:0.85em;color:#fbbf24;">⚠️ Redshirt deadline: setting redshirts locks after this week's game. Redshirts develop slowly without using an eligibility year.</div>` : ''}
                     ${s.pendingRecruitWindow ? `<button id="dash-recruit-window" class="primary" style="width: 100%; margin-bottom: 10px; background: #4ade80; color: #000;">🎯 Recruiting Window (Week ${s.pendingRecruitWindow})</button>` : ''}
-                    <button id="dash-schedule" class="secondary" style="width: 100%;">Team Schedule</button>
+                    <button id="dash-schedule" class="secondary" style="width: 100%; margin-bottom: 10px;">Team Schedule</button>
+                    <button id="dash-save-exit" class="secondary" style="width: 100%;">Save & Exit to Menu</button>
                 </div>
                 <div class="dashboard-panel">
                     <h2>Team Management</h2>
@@ -136,6 +137,7 @@ export function render(container) {
     if (rwBtn) rwBtn.onclick = () => showScreen('recruit-window');
 
     container.querySelector('#dash-schedule').onclick = () => showScreen('schedule');
+    container.querySelector('#dash-save-exit').onclick = () => { persist(); showScreen('menu'); };
     container.querySelector('#dash-roster').onclick = () => showScreen('roster');
     container.querySelector('#dash-coach').onclick = () => showScreen('coach-profile');
     container.querySelector('#dash-bracket').onclick = () => showScreen('bracket');
