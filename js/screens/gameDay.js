@@ -1,7 +1,7 @@
 // screens/gameDay.js — period-by-period replay of the user's game.
 // The week was already simmed (every league game sims instantly); the event
 // log recorded at sim time lets the user watch their game unfold.
-import { getState, getUserTeam } from '../store.js';
+import { getState, getUserTeam, update } from '../store.js';
 import { showScreen } from '../router.js';
 import { esc, scheduleLabel } from '../ui.js';
 import { calculateTeamRatings } from '../engine.js';
@@ -87,6 +87,27 @@ function injuryList(team) {
     return out;
 }
 
+// The week sims instantly, so the pregame replays a game that's already in
+// the books. Rewind a team to its pre-game snapshot (taken at sim time) for
+// a true pre-game view. Falls back to the live team when there's no snapshot.
+function rewoundTeam(team, snap) {
+    if (!snap) return team;
+    const rw = (p) => {
+        const ps = snap.players[p.id];
+        return ps ? { ...p, seasonGoals: ps.g, seasonAssists: ps.a, injuryWeeks: ps.inj, status: ps.st } : p;
+    };
+    return {
+        ...team,
+        wins: snap.w, losses: snap.l, otl: snap.o,
+        confWins: snap.cw, confLosses: snap.cl, confOtl: snap.co,
+        roster: {
+            forwards: (team.roster.forwards || []).map(rw),
+            defensemen: (team.roster.defensemen || []).map(rw),
+            goalies: (team.roster.goalies || []).map(rw),
+        }
+    };
+}
+
 export function render(container, params) {
     const s = getState();
     const team = getUserTeam();
@@ -110,7 +131,10 @@ export function render(container, params) {
         const step = steps[stepIdx];
 
         if (step === 'pregame') {
-            // Tale of the tape.
+            // Pre-game view: records, ranks, players and injuries are rewound
+            // to the snapshot — the sim already played this game.
+            const awayPre = rewoundTeam(away, game.preGame?.away);
+            const homePre = rewoundTeam(home, game.preGame?.home);
             const ar = calculateTeamRatings(away.id, s);
             const hr = calculateTeamRatings(home.id, s);
             const eff = r => ({
@@ -166,20 +190,20 @@ export function render(container, params) {
             container.innerHTML = `
                 <div class="dashboard-panel" style="max-width: 720px; margin: 0 auto;">
                     <p style="color:#888;margin:0;text-align:center;">${scheduleLabel(weekIndex + 1)}</p>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:12px 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0;">
                         <div style="flex:1;text-align:center;">
                             <div style="font-size:1.3em;font-weight:bold;">${esc(away.name)}</div>
-                            <div style="color:#888;">${record(away)} · ${ordinal(confRank(away, s))}, ${esc(shortConf(away.confId))}</div>
+                            <div style="color:#888;">${record(awayPre)} · ${ordinal(confRank(awayPre, s))}, ${esc(shortConf(away.confId))}</div>
                             <div style="margin-top:6px;">${formChips(aGames, away.id)}</div>
                         </div>
-                        <div style="color:#666;font-weight:bold;padding-top:4px;">at</div>
+                        <div style="color:#666;font-weight:bold;">at</div>
                         <div style="flex:1;text-align:center;">
                             <div style="font-size:1.3em;font-weight:bold;">${esc(home.name)}</div>
-                            <div style="color:#888;">${record(home)} · ${ordinal(confRank(home, s))}, ${esc(shortConf(home.confId))}</div>
+                            <div style="color:#888;">${record(homePre)} · ${ordinal(confRank(homePre, s))}, ${esc(shortConf(home.confId))}</div>
                             <div style="margin-top:6px;">${formChips(hGames, home.id)}</div>
                         </div>
                     </div>
-                    <h3 style="margin:16px 0 4px;text-align:center;">Tale of the Tape</h3>
+                    <div style="margin:10px 0 12px;font-size:0.92em;color:#aaa;text-align:center;"><strong style="color:#fff;">Head-to-head:</strong> ${h2hLine}</div>
                     <table style="width:100%;border-collapse:collapse;font-size:0.95em;">
                         <tr style="color:#888;"><td></td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(away.abbr)}</td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(home.abbr)}</td></tr>
                         ${tapeRow('OVR', ovr(ae), ovr(he))}
@@ -190,9 +214,8 @@ export function render(container, params) {
                         ${tapeRow('GA/GP', aGF.ga, hGF.ga, false)}
                     </table>
                     <div style="margin-top:14px;font-size:0.92em;color:#aaa;">
-                        <div style="margin-bottom:6px;"><strong style="color:#fff;">Head-to-head:</strong> ${h2hLine}</div>
-                        <div style="margin-bottom:6px;"><strong style="color:#fff;">Players to watch:</strong><br>${ptw(away)} (${esc(away.abbr)})<br>${ptw(home)} (${esc(home.abbr)})</div>
-                        <div><strong style="color:#fff;">Injuries:</strong> ${esc(away.abbr)}: ${injLine(away)} · ${esc(home.abbr)}: ${injLine(home)}</div>
+                        <div style="margin-bottom:6px;"><strong style="color:#fff;">Players to watch:</strong><br>${ptw(awayPre)} (${esc(away.abbr)})<br>${ptw(homePre)} (${esc(home.abbr)})</div>
+                        <div><strong style="color:#fff;">Injuries:</strong> ${esc(away.abbr)}: ${injLine(awayPre)} · ${esc(home.abbr)}: ${injLine(homePre)}</div>
                     </div>
                     <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
                         <button id="gd-start" class="primary" style="width:auto;">Drop the Puck</button>
@@ -216,8 +239,14 @@ export function render(container, params) {
                     ${finalShots}
                     <button id="gd-continue" class="primary" style="width:auto;">Continue</button>
                 </div>`;
-            container.querySelector('#gd-continue').onclick = () =>
+            container.querySelector('#gd-continue').onclick = () => {
+                // The pre-game snapshot served its purpose; drop it to keep saves lean.
+                update(st => {
+                    const g = (st.schedule[weekIndex] || []).find(x => x.homeTeamId === game.homeTeamId && x.awayTeamId === game.awayTeamId);
+                    if (g) delete g.preGame;
+                });
                 showScreen('weekly-recap', { weekIndex, confId: params.confId || team.confId });
+            };
             return;
         }
 

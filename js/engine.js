@@ -593,6 +593,25 @@ export function simulateWeek(gameState) {
     // as it was on game day.
     const rankOf = new Map(gameState.leagueTeams.map(t => [t.id, nationalRank(gameState.leagueTeams, t.id, gameState.schedule)]));
 
+    // Pre-game snapshot for the user's game: the week sims instantly, so by
+    // the time the game-day screen replays it, records and player stats
+    // already include the result. The snapshot lets the pregame show the
+    // true pre-game state.
+    const snapTeam = (t) => {
+        const players = {};
+        for (const key of ['forwards', 'defensemen', 'goalies'])
+            for (const p of (t.roster[key] || []))
+                players[p.id] = {
+                    g: p.seasonGoals || 0, a: p.seasonAssists || 0,
+                    inj: p.injuryWeeks || 0, st: p.status
+                };
+        return {
+            w: t.wins || 0, l: t.losses || 0, o: t.otl || 0,
+            cw: t.confWins || 0, cl: t.confLosses || 0, co: t.confOtl || 0,
+            players
+        };
+    };
+
     weekGames.forEach(game => {
         if (game.played) return;
 
@@ -601,6 +620,9 @@ export function simulateWeek(gameState) {
 
         const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
         const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+        if (!game.preGame && (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId)) {
+            game.preGame = { home: snapTeam(homeTeam), away: snapTeam(awayTeam) };
+        }
         const isConfGame = game.type === 'conf' || game.type === 'conf_tourney';
 
         const homeRatings = calculateTeamRatings(homeTeam.id, gameState);
