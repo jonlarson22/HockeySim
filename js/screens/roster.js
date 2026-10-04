@@ -181,7 +181,7 @@ function paintLines(container, team, backToRoster) {
                 '<strong>Line ' + l + '</strong>' +
                 '<span style="font-size:0.9em;">Eff OVR <strong>' + eff.toFixed(1) + '</strong> <span style="color:' + chemColor + ';">(' + chemTxt + ' chem)</span></span>' +
                 '</div>' +
-                '<div style="display:flex;gap:8px;">' + card(C, 'C') + card(LW, 'LW') + card(RW, 'RW') + '</div>' +
+                '<div style="display:flex;gap:8px;">' + card(LW, 'LW') + card(C, 'C') + card(RW, 'RW') + '</div>' +
                 '</div>';
         }).join('');
 
