@@ -187,18 +187,16 @@ export function render(container, params) {
             const inner = `
                 <div class="dashboard-panel" style="max-width: 720px; margin: 0 auto;">
                     <p style="color:#888;margin:0;text-align:center;">${scheduleLabel(weekIndex + 1)}</p>
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0;">
-                        <div style="flex:1;text-align:center;">
-                            <div style="font-size:1.3em;font-weight:bold;">${esc(away.name)}</div>
-                            <div style="color:#888;">${record(awayPre)} · ${ordinal(confRank(awayPre, s))}, ${esc(shortConf(away.confId))}</div>
-                            <div style="margin-top:6px;">${formChips(aGames, away.id)}</div>
-                        </div>
-                        <div style="color:#666;font-weight:bold;">at</div>
-                        <div style="flex:1;text-align:center;">
-                            <div style="font-size:1.3em;font-weight:bold;">${esc(home.name)}</div>
-                            <div style="color:#888;">${record(homePre)} · ${ordinal(confRank(homePre, s))}, ${esc(shortConf(home.confId))}</div>
-                            <div style="margin-top:6px;">${formChips(hGames, home.id)}</div>
-                        </div>
+                    <div style="text-align:center;margin:12px 0;">
+                        <div style="font-size:1.3em;font-weight:bold;">${esc(away.name)}</div>
+                        <div style="color:#888;">${record(awayPre)} · ${ordinal(confRank(awayPre, s))}, ${esc(shortConf(away.confId))}</div>
+                        <div style="margin-top:6px;">${formChips(aGames, away.id)}</div>
+                    </div>
+                    <div style="text-align:center;color:#666;font-weight:bold;margin:4px 0;">at</div>
+                    <div style="text-align:center;margin:12px 0;">
+                        <div style="font-size:1.3em;font-weight:bold;">${esc(home.name)}</div>
+                        <div style="color:#888;">${record(homePre)} · ${ordinal(confRank(homePre, s))}, ${esc(shortConf(home.confId))}</div>
+                        <div style="margin-top:6px;">${formChips(hGames, home.id)}</div>
                     </div>
                     <div style="margin:10px 0 12px;font-size:0.92em;color:#aaa;text-align:center;"><strong style="color:#fff;">Head-to-head</strong><br>${h2hLine}</div>
                     <table style="width:100%;border-collapse:collapse;font-size:0.95em;">
