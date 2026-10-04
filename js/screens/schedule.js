@@ -31,7 +31,7 @@ export function render(container) {
 
     container.innerHTML = `
         <div class="dashboard-panel">
-            <h2>Season Schedule</h2>
+            <h2>Team Schedule</h2>
             <button id="sched-back" class="secondary" style="margin-bottom:15px;">Back to Dashboard</button>
             <div style="background:#222;padding:15px;border-radius:8px;">${rows}</div>
         </div>`;
