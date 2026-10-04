@@ -18,15 +18,31 @@ export function render(container, params) {
             const away = s.leagueTeams.find(t => t.id === g.awayTeamId);
             return home.confId === filterId || away.confId === filterId;
         });
+        // Record going into the game: current totals minus this game's result.
+        const preRec = (t, g) => {
+            if (g.homeScore == null) return `${t.wins || 0}-${t.losses || 0}-${t.otl || 0}`;
+            let w = t.wins || 0, l = t.losses || 0, o = t.otl || 0;
+            const mine = g.homeTeamId === t.id ? g.homeScore : g.awayScore;
+            const theirs = g.homeTeamId === t.id ? g.awayScore : g.homeScore;
+            if (mine > theirs) w--; else if (g.ot) o--; else l--;
+            return `${w}-${l}-${o}`;
+        };
+        const rankTxt = r => (r && r <= 25 ? `<span style="color:#fbbf24;font-weight:bold;">#${r}</span> ` : '');
         list.innerHTML = games.map(g => {
             const home = s.leagueTeams.find(t => t.id === g.homeTeamId);
             const away = s.leagueTeams.find(t => t.id === g.awayTeamId);
-            const ot = g.ot ? " <span style='color:#888;font-size:0.8em;'>(OT)</span>" : '';
             const hc = home.id === team.id ? 'var(--accent)' : '#fff';
             const ac = away.id === team.id ? 'var(--accent)' : '#fff';
-            return `<div style="background:#222;padding:10px;border-radius:4px;border-left:4px solid ${home.color};margin-bottom:5px;">
-                <div style="display:flex;justify-content:space-between;color:${ac};"><span>${esc(away.name)}</span><span>${g.awayScore}</span></div>
-                <div style="display:flex;justify-content:space-between;color:${hc};"><span>${esc(home.name)}</span><span>${g.homeScore}${ot}</span></div>
+            return `<div style="background:#222;padding:10px;border-radius:4px;border-left:4px solid ${home.color};margin-bottom:5px;display:flex;align-items:center;gap:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="color:${ac};">${rankTxt(g.awayRank)}${esc(away.name)} <span style="color:#888;font-size:0.8em;">${preRec(away, g)}</span></div>
+                    <div style="color:${hc};">${rankTxt(g.homeRank)}${esc(home.name)} <span style="color:#888;font-size:0.8em;">${preRec(home, g)}</span></div>
+                </div>
+                <div style="color:#888;font-size:0.8em;min-width:32px;text-align:center;">${g.ot ? '(OT)' : ''}</div>
+                <div style="min-width:26px;text-align:right;font-weight:bold;">
+                    <div style="color:${ac};">${g.awayScore}</div>
+                    <div style="color:${hc};">${g.homeScore}</div>
+                </div>
             </div>`;
         }).join('') || '<p style="color:#888;">No games this week.</p>';
     };
@@ -39,7 +55,7 @@ export function render(container, params) {
             </div>
             <select id="recap-filter" class="input-field" style="width:100%;margin-bottom:15px;">
                 <option value="all">National (All)</option>
-                ${conferences.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+                ${[...conferences].sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
             </select>
             <div id="recap-list" style="display:flex;flex-direction:column;gap:10px;"></div>
         </div>`;
@@ -50,26 +66,4 @@ export function render(container, params) {
     paint(initial);
     filter.onchange = e => paint(e.target.value);
     container.querySelector('#recap-continue').onclick = () => showScreen('dashboard');
-
-    // Mystery, Alaska: if the underdogs from Alaska knock off a giant,
-    // it gets a headline.
-    const alaska = s.leagueTeams.find(t => t.id === 'team_alaska');
-    let biggest = null;
-    weekGames.forEach(g => {
-        if (g.homeScore == null) return;
-        const home = s.leagueTeams.find(t => t.id === g.homeTeamId);
-        const away = s.leagueTeams.find(t => t.id === g.awayTeamId);
-        if (!home || !away) return;
-        const winner = g.homeScore > g.awayScore ? home : away;
-        const loser = winner === home ? away : home;
-        if (winner.id === 'team_alaska' && alaska && (loser.prestige - alaska.prestige) >= 20) {
-            const gap = loser.prestige - alaska.prestige;
-            if (!biggest || gap > biggest.gap) biggest = { gap, loser, ws: Math.max(g.homeScore, g.awayScore), ls: Math.min(g.homeScore, g.awayScore) };
-        }
-    });
-    if (biggest) {
-        const banner = document.createElement('div');
-        banner.innerHTML = `<div style="background:#0c2a4a;border:2px solid #1D5FA8;padding:12px;border-radius:8px;margin-bottom:15px;text-align:center;font-size:1.1em;">🏒 <strong>MYSTERY, ALASKA:</strong> Alaska stuns ${esc(biggest.loser.name)} ${biggest.ws}–${biggest.ls}!</div>`;
-        container.querySelector('.dashboard-panel').insertBefore(banner, container.querySelector('#recap-filter'));
-    }
 }

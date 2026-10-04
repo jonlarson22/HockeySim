@@ -3,7 +3,7 @@ import { getRandomFirstName, getRandomLastName, conferences, teams as baseTeams 
 // Designed league-average prestige (the 25–90 spread's center). The offseason
 // peg recenters on this so the league mean can't inflate over the decades.
 const DESIGN_MEAN = baseTeams.reduce((a, t) => a + t.prestige, 0) / baseTeams.length;
-import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole } from './lines.js';
+import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole, autoFormDPairs, getDPairs } from './lines.js';
 
 import { 
     generateConferenceQuarterfinals, 
@@ -132,7 +132,9 @@ export function generatePlayer(position, teamPrestige) {
         roleWeeks: { active: 0, practice: 0, redshirt: 0 },
         // Forwards: natural position (C/LW/RW) and home line slot (L1C..L4RW).
         // lineSlot is the player's "home" — kept through injuries, reclaimed on return.
-        ...(isForward ? { linePos: ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)], lineSlot: null } : {})
+        ...(isForward ? { linePos: ['C', 'LW', 'RW'][Math.floor(Math.random() * 3)], lineSlot: null } : {}),
+        // Defensemen: home D-pair slot (D1A..D3B).
+        ...(position === 'D' ? { pairSlot: null } : {})
     };
 }
 
@@ -140,9 +142,11 @@ export function generatePlayer(position, teamPrestige) {
 export function generateTeamRoster(teamPrestige) {
     const forwards = Array.from({ length: 15 }, () => generatePlayer('F', teamPrestige));
     autoFormLines(forwards);
+    const defensemen = Array.from({ length: 8 }, () => generatePlayer('D', teamPrestige));
+    autoFormDPairs(defensemen);
     return {
         goalies: Array.from({ length: 3 }, () => generatePlayer('G', teamPrestige)),
-        defensemen: Array.from({ length: 8 }, () => generatePlayer('D', teamPrestige)),
+        defensemen,
         forwards
     };
 }
@@ -356,7 +360,20 @@ export function calculateTeamRatings(teamId, gameState) {
     else offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
 
     let defOvr = 0;
-    if (activeDefense.length >= 6) {
+    const dPairs = getDPairs(activeDefense);
+    const hasPairSlots = [1, 2, 3].some(p => dPairs[p].A || dPairs[p].B);
+    if (hasPairSlots) {
+        // User-arranged pairs: pair 1 gets 40%, pair 2 gets 35%, pair 3 gets 25%.
+        const dw = [0.40, 0.35, 0.25];
+        let dwSum = 0;
+        for (let p = 1; p <= 3; p++) {
+            const { A, B } = dPairs[p];
+            if (A && B) { defOvr += ((A.overall + B.overall) / 2) * dw[p - 1]; dwSum += dw[p - 1]; }
+            else if (A || B) { defOvr += (A || B).overall * dw[p - 1]; dwSum += dw[p - 1]; }
+        }
+        defOvr = dwSum > 0 ? defOvr / dwSum
+            : activeDefense.reduce((sum, p) => sum + p.overall, 0) / (activeDefense.length || 1);
+    } else if (activeDefense.length >= 6) {
         const g1 = (activeDefense[0].overall + activeDefense[1].overall) / 2;
         const g2 = (activeDefense[2].overall + activeDefense[3].overall) / 2;
         const g3 = (activeDefense[4].overall + activeDefense[5].overall) / 2;
@@ -365,7 +382,12 @@ export function calculateTeamRatings(teamId, gameState) {
         defOvr = activeDefense.reduce((sum, p) => sum + p.overall, 0) / (activeDefense.length || 1);
     }
 
-    let goalieOvr = activeGoalies.length > 0 ? activeGoalies[0].overall : 50;
+    // Starting goalie: the user's pick if healthy, else the first active.
+    let goalieOvr = 50;
+    if (activeGoalies.length > 0) {
+        const starter = activeGoalies.find(g => g.id === team.starterGoalieId) || activeGoalies[0];
+        goalieOvr = starter.overall;
+    }
 
     let coachOffBoost = 0;
     let coachDefBoost = 0;
@@ -467,15 +489,56 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
     }
 
     // Chronological order, then attach the running score to each event.
-    events.sort((a, b) => a.period - b.period || a.minute - b.minute || a.second - b.second);
+    // Penalties become visible events (they used to be invisible PIM rolls).
+    // 3-7 minors per team per game, Power Forwards take more. Pure annotation.
+    const INFRACTIONS = ['Tripping', 'Hooking', 'Slashing', 'High-sticking', 'Interference',
+        'Roughing', 'Cross-checking', 'Delay of game', 'Too many men', 'Boarding', 'Charging', 'Elbowing'];
+    const penalties = [];
+    const takePenalty = (team, skaters, period, minute, second) => {
+        if (!skaters.length) return;
+        const pool = skaters.map(s => ({ p: s.p, w: getRole(s.p) === 'Power Forward' ? 2 : 1 }));
+        let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
+        let perp = pool[pool.length - 1].p;
+        for (const s of pool) { r -= s.w; if (r <= 0) { perp = s.p; break; } }
+        penalties.push({
+            kind: 'penalty', period, minute, second, teamId: team.id,
+            playerId: perp.id, player: `${perp.firstName} ${perp.lastName}`,
+            infraction: INFRACTIONS[Math.floor(Math.random() * INFRACTIONS.length)],
+            minutes: 2,
+        });
+    };
+    for (const [team, skaters] of [[homeTeam, homeSkaters], [awayTeam, awaySkaters]]) {
+        const n = randomInt(3, 7);
+        for (let i = 0; i < n; i++) {
+            takePenalty(team, skaters, 1 + Math.floor(Math.random() * 3),
+                Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 60));
+        }
+    }
+    // Every power-play goal gets a preceding penalty so the story coheres.
+    for (const g of events.filter(e => e.isPP)) {
+        const oppTeam = g.teamId === homeTeam.id ? awayTeam : homeTeam;
+        const oppSkaters = g.teamId === homeTeam.id ? awaySkaters : homeSkaters;
+        const gt = g.minute * 60 + g.second;
+        const hasCause = penalties.some(p => p.teamId === oppTeam.id && p.period === g.period &&
+            (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) <= 300);
+        if (!hasCause) {
+            const pt = Math.max(0, gt - (60 + Math.floor(Math.random() * 180)));
+            takePenalty(oppTeam, oppSkaters, g.period, Math.floor(pt / 60), pt % 60);
+        }
+    }
+
+    // Chronological order, then attach the running score to each event
+    // (penalties don't change the score).
+    const all = [...events.map(e => ({ ...e, kind: 'goal' })), ...penalties];
+    all.sort((a, b) => a.period - b.period || a.minute - b.minute || a.second - b.second);
     let hs = 0, as = 0;
-    events.forEach(e => {
-        if (e.teamId === homeTeam.id) hs++; else as++;
+    all.forEach(e => {
+        if (e.kind === 'goal') { if (e.teamId === homeTeam.id) hs++; else as++; }
         e.homeScore = hs;
         e.awayScore = as;
     });
 
-    return events;
+    return all;
 }
 
 // Adds G/A from a game's events to the roster players' season totals.
@@ -516,20 +579,12 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         for (const p of activeSkaters(conceded)) p.seasonPlusMinus = (p.seasonPlusMinus || 0) - 1;
     }
 
-    // Penalties: 3-7 minors per team per game, Power Forwards take more.
-    // Pure annotation — does not affect the final score.
-    for (const team of [homeTeam, awayTeam]) {
-        const skaters = activeSkaters(team);
-        if (!skaters.length) continue;
-        const weights = skaters.map(p => getRole(p) === 'Power Forward' ? 2 : 1);
-        const totalW = weights.reduce((a, b) => a + b, 0);
-        for (let i = 0, minors = randomInt(3, 7); i < minors; i++) {
-            let r = Math.random() * totalW;
-            for (let j = 0; j < skaters.length; j++) {
-                r -= weights[j];
-                if (r <= 0) { skaters[j].seasonPIM = (skaters[j].seasonPIM || 0) + 2; break; }
-            }
-        }
+    // Penalty minutes from the game's penalty events (replaces the old invisible roll).
+    for (const e of events) {
+        if (e.kind !== 'penalty' || !e.playerId || e.playerId === 'none') continue;
+        const team = e.teamId === homeTeam.id ? homeTeam : awayTeam;
+        const p = find(team, e.playerId);
+        if (p) p.seasonPIM = (p.seasonPIM || 0) + (e.minutes || 2);
     }
 
     // Goalie saves: shots faced minus goals allowed. Same shot formula as
@@ -564,6 +619,7 @@ export function buildGameShots(homeTeam, awayTeam, events) {
     const shots = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
     const goals = { home: [0, 0, 0, 0], away: [0, 0, 0, 0] };
     for (const e of events) {
+        if (e.kind === 'penalty') continue;
         const side = e.teamId === homeTeam.id ? 'home' : 'away';
         if (e.period >= 1 && e.period <= 4) goals[side][e.period - 1]++;
     }
@@ -690,53 +746,60 @@ export function simulateWeek(gameState) {
         }
     });
     
-    // --- INJURY MANAGEMENT & PROGRESSION ---
-    // Roster lives on the user's team object (see store.js) — never a top-level duplicate.
-    const userTeam = gameState.leagueTeams.find(t => t.id === gameState.teamId);
-    const userRoster = userTeam ? userTeam.roster : null;
-    if (userRoster) {
-        const coachDev = gameState.coach.skills.development || 5;
-        const allPlayers = [...userRoster.goalies, ...userRoster.defensemen, ...userRoster.forwards];
-        
+    // --- INJURY MANAGEMENT (all teams) & PROGRESSION (user team) ---
+    // Roster lives on each leagueTeams team object (see store.js) — never a top-level duplicate.
+    const coachDev = (gameState.coach && gameState.coach.skills.development) || 5;
+    for (const t of gameState.leagueTeams) {
+        const roster = t.roster;
+        if (!roster) continue;
+        const isUser = t.id === gameState.teamId;
+        const allPlayers = [...(roster.goalies || []), ...(roster.defensemen || []), ...(roster.forwards || [])];
+
         allPlayers.forEach(player => {
             if (player.injuryWeeks > 0) {
                 player.injuryWeeks--;
                 if (player.injuryWeeks === 0 && player.status === 'Practice Squad') {
                     player.status = 'Active Roster';
-                    // Reclaim home line slot: evict the temp fill-in if there is one.
-                    // If the user deliberately moved someone into the slot, wait
-                    // as a healthy scratch (lineSlot cleared for manual placement).
-                    if (player.lineSlot) {
-                        const occupant = userRoster.forwards.find(p =>
-                            p.id !== player.id && p.lineSlot === player.lineSlot &&
-                            p.status === 'Active Roster' && p.injuryWeeks === 0);
-                        if (occupant && occupant.tempFill) {
-                            occupant.lineSlot = null;
-                            occupant.tempFill = false;
-                            occupant.status = 'Practice Squad';
-                        } else if (occupant) {
-                            player.lineSlot = null;
+                    if (isUser) {
+                        // Reclaim home line slot: evict the temp fill-in if there is one.
+                        // If the user deliberately moved someone into the slot, wait
+                        // as a healthy scratch (lineSlot cleared for manual placement).
+                        if (player.lineSlot) {
+                            const occupant = roster.forwards.find(p =>
+                                p.id !== player.id && p.lineSlot === player.lineSlot &&
+                                p.status === 'Active Roster' && p.injuryWeeks === 0);
+                            if (occupant && occupant.tempFill) {
+                                occupant.lineSlot = null;
+                                occupant.tempFill = false;
+                                occupant.status = 'Practice Squad';
+                            } else if (occupant) {
+                                player.lineSlot = null;
+                            }
                         }
                     }
                 }
             } else if (player.status === 'Active Roster' && Math.random() < 0.02) {
                 player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
                 player.status = 'Practice Squad';
-                // lineSlot is the player's home — kept through the injury.
-                // Auto-replace with best available practice squad player
-                const allPracticeSquad = [...userRoster.forwards, ...userRoster.defensemen, ...userRoster.goalies]
-                    .filter(p => p.status === 'Practice Squad' && p.id !== player.id)
-                    .sort((a, b) => b.overall - a.overall);
-                if (allPracticeSquad.length > 0) {
-                    const sub = allPracticeSquad[0];
-                    sub.status = 'Active Roster';
-                    // Forward line slot: temp fill-in holds the home slot.
-                    if (player.lineSlot && sub.position === 'F' && !sub.lineSlot) {
-                        sub.lineSlot = player.lineSlot;
-                        sub.tempFill = true;
+                if (isUser) {
+                    // lineSlot is the player's home — kept through the injury.
+                    // Auto-replace with best available practice squad player
+                    const allPracticeSquad = [...roster.forwards, ...roster.defensemen, ...roster.goalies]
+                        .filter(p => p.status === 'Practice Squad' && p.id !== player.id)
+                        .sort((a, b) => b.overall - a.overall);
+                    if (allPracticeSquad.length > 0) {
+                        const sub = allPracticeSquad[0];
+                        sub.status = 'Active Roster';
+                        // Forward line slot: temp fill-in holds the home slot.
+                        if (player.lineSlot && sub.position === 'F' && !sub.lineSlot) {
+                            sub.lineSlot = player.lineSlot;
+                            sub.tempFill = true;
+                        }
                     }
                 }
             }
+
+            if (!isUser) return;
 
             // Track which role the player filled this week (drives offseason math).
             if (!player.roleWeeks) player.roleWeeks = { active: 0, practice: 0, redshirt: 0 };

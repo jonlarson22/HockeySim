@@ -25,6 +25,53 @@ export function slotFor(line, pos) {
     return `L${line}${pos}`;
 }
 
+// Slot string for D pair p (1-3) and side ('A'/'B'), e.g. "D2A".
+export function dPairSlotFor(pair, side) {
+    return `D${pair}${side}`;
+}
+
+// All 6 defense slots in order.
+export function allDPairSlots() {
+    const slots = [];
+    for (let p = 1; p <= 3; p++) for (const s of ['A', 'B']) slots.push(dPairSlotFor(p, s));
+    return slots;
+}
+
+// Top 2 -> pair 1, next 2 -> pair 2, next 2 -> pair 3.
+export function autoFormDPairs(defensemen) {
+    const pool = [...defensemen].sort((a, b) => (b.overall || 0) - (a.overall || 0));
+    let i = 0;
+    for (let p = 1; p <= 3; p++) {
+        for (const s of ['A', 'B']) {
+            const d = pool[i++];
+            if (d) d.pairSlot = dPairSlotFor(p, s);
+        }
+    }
+    return defensemen;
+}
+
+// Pairs keyed by number, each {A, B}.
+export function getDPairs(defensemen) {
+    const pairs = { 1: {}, 2: {}, 3: {} };
+    for (const d of defensemen) {
+        const m = /^D([1-3])([AB])$/.exec(d.pairSlot || '');
+        if (m) pairs[+m[1]][m[2]] = d;
+    }
+    return pairs;
+}
+
+// Fill vacant D-pair slots with the best unslotted active defensemen.
+// Never reshuffles existing assignments.
+export function fillVacantDPairSlots(defensemen) {
+    const taken = new Set(defensemen.filter(d => d.pairSlot).map(d => d.pairSlot));
+    const vacant = allDPairSlots().filter(s => !taken.has(s));
+    const candidates = defensemen
+        .filter(d => !d.pairSlot && d.status === 'Active Roster' && !d.injuryWeeks)
+        .sort((a, b) => (b.overall || 0) - (a.overall || 0));
+    vacant.forEach((slot, i) => { if (candidates[i]) candidates[i].pairSlot = slot; });
+    return defensemen;
+}
+
 // All 12 forward slots in order.
 export function allForwardSlots() {
     const slots = [];

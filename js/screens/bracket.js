@@ -47,12 +47,6 @@ export function render(container) {
             { week: 45, name: 'Semifinals', seeds: [[1,4],[2,3]] },
             { week: 46, name: 'Championship', seeds: [[1,2]] }
         ];
-        // The boys from Mystery are going dancing.
-        const natIds = new Set();
-        (s.schedule[41] || []).filter(g => g.isNational).forEach(g => { natIds.add(g.homeTeamId); natIds.add(g.awayTeamId); });
-        if (natIds.has('team_alaska')) {
-            html += `<div style="background:#0c2a4a;border:2px solid #1D5FA8;padding:12px;border-radius:8px;margin:10px 0;text-align:center;">🏒 The boys from Mystery are going dancing — <strong>Alaska</strong> is in the national tournament!</div>`;
-        }
         rounds.forEach(round => {
             const games = (s.schedule[round.week - 1] || []).filter(g => g.type === 'national_tourney' || g.isNational);
             if (games.length === 0) return;

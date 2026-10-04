@@ -127,10 +127,7 @@ export function render(container, params) {
 
     const scoreLine = (a, h) => `${esc(away.abbr)} ${a} – ${h} ${esc(home.abbr)}`;
 
-    const paint = () => {
-        const step = steps[stepIdx];
-
-        if (step === 'pregame') {
+    const pregameInner = () => {
             // Pre-game view: records, ranks, players and injuries are rewound
             // to the snapshot — the sim already played this game.
             const awayPre = rewoundTeam(away, game.preGame?.away);
@@ -187,7 +184,7 @@ export function render(container, params) {
                     + (inj.length > 3 ? ` <span style="color:#888;">+${inj.length - 3} more</span>` : '');
             };
 
-            container.innerHTML = `
+            const inner = `
                 <div class="dashboard-panel" style="max-width: 720px; margin: 0 auto;">
                     <p style="color:#888;margin:0;text-align:center;">${scheduleLabel(weekIndex + 1)}</p>
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0;">
@@ -217,80 +214,173 @@ export function render(container, params) {
                         <div style="margin-bottom:6px;"><strong style="color:#fff;">Players to watch:</strong><br>${ptw(awayPre)} (${esc(away.abbr)})<br>${ptw(homePre)} (${esc(home.abbr)})</div>
                         <div><strong style="color:#fff;">Injuries:</strong> ${esc(away.abbr)}: ${injLine(awayPre)} · ${esc(home.abbr)}: ${injLine(homePre)}</div>
                     </div>
-                    <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
-                        <button id="gd-start" class="primary" style="width:auto;">Drop the Puck</button>
-                        <button id="gd-skip" class="secondary" style="width:auto;">Sim to End</button>
-                    </div>
                 </div>`;
-            container.querySelector('#gd-start').onclick = () => { stepIdx++; paint(); };
-            container.querySelector('#gd-skip').onclick = () => { stepIdx = steps.indexOf('final'); paint(); };
-            return;
-        }
+            return inner;
+        };
 
-        if (step === 'final') {
-            const tot = a => a.reduce((x, y) => x + y, 0);
-            const finalShots = game.shots ? `
-                <p style="color:#888;margin:10px 0 0;">Shots: ${esc(away.abbr)} ${tot(game.shots.shots.away)} – ${tot(game.shots.shots.home)} ${esc(home.abbr)}
-                <span style="margin:0 8px;">·</span>Saves: ${tot(game.shots.saves.away)} – ${tot(game.shots.saves.home)}</p>` : '';
-            container.innerHTML = `
-                <div class="dashboard-panel text-center" style="max-width: 640px; margin: 0 auto;">
-                    <p style="color:#888;margin:0;">FINAL${game.ot ? ' (OT)' : ''}</p>
-                    <h2 style="margin: 15px 0; font-size: 2em;">${scoreLine(game.awayScore, game.homeScore)}</h2>
-                    ${finalShots}
-                    <button id="gd-continue" class="primary" style="width:auto;">Continue</button>
-                </div>`;
-            container.querySelector('#gd-continue').onclick = () => {
-                // The pre-game snapshot served its purpose; drop it to keep saves lean.
-                update(st => {
-                    const g = (st.schedule[weekIndex] || []).find(x => x.homeTeamId === game.homeTeamId && x.awayTeamId === game.awayTeamId);
-                    if (g) delete g.preGame;
-                });
-                showScreen('weekly-recap', { weekIndex, confId: params.confId || team.confId });
-            };
-            return;
-        }
+    const periodSteps = steps.filter(x => typeof x === 'number');
 
-        // A period.
-        const evs = events.filter(e => e.period === step);
+    // One event row: goals and penalties share the ticker, penalties in gold.
+    const eventRow = (e, i, animate) => {
+        const t = e.teamId === home.id ? home : away;
+        const anim = animate ? `animation-delay:${(i * 0.45).toFixed(2)}s;` : 'animation:none;';
+        const badge = `<span style="background:${t.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;">${esc(t.abbr)}</span>`;
+        const score = `<span style="font-weight:bold;white-space:nowrap;">${e.awayScore} – ${e.homeScore}</span>`;
+        if (e.kind === 'penalty') {
+            return `<div class="event-row" style="${anim}">
+                <span style="color:#888;min-width:44px;">${fmtTime(e)}</span>${badge}
+                <span style="flex:1;">${esc(e.player)} <span style="color:#fbbf24;font-size:0.85em;">— ${esc(e.infraction)}, ${e.minutes} min</span></span>${score}
+            </div>`;
+        }
+        const assists = e.assists.length
+            ? `<div style="color:#888;font-size:0.85em;">${e.assists.map(esc).join(', ')}</div>` : '';
+        const pp = e.isPP ? ' <span style="color:#fbbf24;font-size:0.75em;font-weight:bold;">PP</span>' : '';
+        return `<div class="event-row" style="${anim}">
+            <span style="color:#888;min-width:44px;">${fmtTime(e)}</span>${badge}
+            <span style="flex:1;"><strong>${esc(e.scorer)}</strong>${pp}${assists}</span>${score}
+        </div>`;
+    };
+
+    const periodHtml = (p, animate) => {
+        const evs = events.filter(e => e.period === p);
         const last = evs[evs.length - 1];
         const endScore = last ? scoreLine(last.awayScore, last.homeScore) : scoreLine(0, 0);
-        const rows = evs.length ? evs.map((e, i) => {
-            const t = e.teamId === home.id ? home : away;
-            const assists = e.assists.length
-                ? `<div style="color:#888;font-size:0.85em;">${e.assists.map(esc).join(', ')}</div>` : '';
-            return `
-                <div class="event-row" style="animation-delay:${(i * 0.45).toFixed(2)}s;">
-                    <span style="color:#888;min-width:44px;">${fmtTime(e)}</span>
-                    <span style="background:${t.color};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75em;font-weight:bold;">${esc(t.abbr)}</span>
-                    <span style="flex:1;"><strong>${esc(e.scorer)}</strong>${assists}</span>
-                    <span style="font-weight:bold;white-space:nowrap;">${e.awayScore} – ${e.homeScore}</span>
-                </div>`;
-        }).join('') : '<p style="color:#888;">No scoring.</p>';
-
-        const nextStep = steps[stepIdx + 1];
-        const nextLabel = nextStep === 'final' ? 'Final' : PERIOD_LABEL[nextStep];
         const perShots = game.shots ? `
-            <div style="color:#888;font-size:0.9em;margin:-8px 0 12px;">
-                Shots: ${esc(away.abbr)} ${game.shots.shots.away[step - 1]} – ${game.shots.shots.home[step - 1]} ${esc(home.abbr)}
-                <span style="margin:0 8px;">·</span>Saves: ${game.shots.saves.away[step - 1]} – ${game.shots.saves.home[step - 1]}
+            <div style="color:#888;font-size:0.9em;margin:-4px 0 10px;">
+                Shots: ${esc(away.abbr)} ${game.shots.shots.away[p - 1]} – ${game.shots.shots.home[p - 1]} ${esc(home.abbr)}
+                <span style="margin:0 8px;">·</span>Saves: ${game.shots.saves.away[p - 1]} – ${game.shots.saves.home[p - 1]}
             </div>` : '';
-
-        container.innerHTML = `
-            <div class="dashboard-panel" style="max-width: 760px; margin: 0 auto;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-                    <h2 style="margin:0;">${PERIOD_LABEL[step]}</h2>
-                    <span style="color:var(--accent);font-weight:bold;">${endScore}</span>
-                </div>
-                ${perShots}
-                ${rows}
-                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:15px;">
-                    <button id="gd-skip" class="secondary" style="width:auto;">Sim to End</button>
-                    <button id="gd-next" class="primary" style="width:auto;">${nextLabel} →</button>
-                </div>
-            </div>`;
-        container.querySelector('#gd-next').onclick = () => { stepIdx++; paint(); };
-        container.querySelector('#gd-skip').onclick = () => { stepIdx = steps.indexOf('final'); paint(); };
+        return `<div id="gd-p${p}" style="margin-top:20px;padding-top:14px;border-top:1px solid #333;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <h2 style="margin:0;">${PERIOD_LABEL[p]}</h2>
+                <span style="color:var(--accent);font-weight:bold;">${endScore}</span>
+            </div>
+            ${perShots}
+            ${evs.length ? evs.map((e, i) => eventRow(e, i, animate)).join('') : '<p style="color:#888;">Nothing happened.</p>'}
+        </div>`;
     };
+
+    // Three stars: most impactful skaters by points (goals break ties).
+    const starsHtml = () => {
+        const tally = new Map();
+        const add = (id, name, teamId, isGoal) => {
+            if (!id || id === 'none') return;
+            if (!tally.has(id)) tally.set(id, { name, teamId, g: 0, a: 0 });
+            const r = tally.get(id);
+            if (isGoal) r.g++; else r.a++;
+        };
+        for (const e of events) {
+            if (e.kind === 'penalty') continue;
+            add(e.scorerId, e.scorer, e.teamId, true);
+            (e.assistIds || []).forEach((aid, i) => add(aid, (e.assists || [])[i] || '', e.teamId, false));
+        }
+        const ranked = [...tally.values()]
+            .map(r => ({ ...r, pts: r.g + r.a }))
+            .filter(r => r.pts > 0)
+            .sort((a, b) => b.pts - a.pts || b.g - a.g)
+            .slice(0, 3);
+        if (!ranked.length) return '';
+        const labels = ['1st Star', '2nd Star', '3rd Star'];
+        const rows = ranked.map((r, i) => {
+            const t = r.teamId === home.id ? home : away;
+            const line = `${r.g}G ${r.a}A`;
+            return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #333;">
+                <span><span style="color:#fbbf24;">★</span> <strong>${labels[i]}</strong>: ${esc(r.name)} <span style="color:#888;font-size:0.85em;">(${esc(t.abbr)})</span></span>
+                <span style="color:#888;">${line}</span>
+            </div>`;
+        }).join('');
+        return `<div style="margin-top:16px;text-align:left;"><h3 style="margin:0 0 6px;">Three Stars</h3>${rows}</div>`;
+    };
+
+    const finalHtml = () => {
+        const tot = a => a.reduce((x, y) => x + y, 0);
+        const perG = {};
+        for (const e of events) {
+            if (e.kind === 'penalty') continue;
+            if (!perG[e.period]) perG[e.period] = { home: 0, away: 0 };
+            if (e.teamId === home.id) perG[e.period].home++; else perG[e.period].away++;
+        }
+        const perRows = periodSteps.map(p => {
+            const g = perG[p] || { home: 0, away: 0 };
+            return `<tr style="border-top:1px solid #333;">
+                <td style="padding:5px 8px;color:#888;">${PERIOD_LABEL[p]}</td>
+                <td style="text-align:center;padding:5px 8px;">${g.away}</td>
+                <td style="text-align:center;padding:5px 8px;">${g.home}</td>
+            </tr>`;
+        }).join('');
+        const sh = game.shots ? {
+            sa: tot(game.shots.shots.away), sh: tot(game.shots.shots.home),
+            va: tot(game.shots.saves.away), vh: tot(game.shots.saves.home),
+        } : null;
+        const pimA = events.filter(e => e.kind === 'penalty' && e.teamId === away.id).reduce((a, e) => a + (e.minutes || 2), 0);
+        const pimH = events.filter(e => e.kind === 'penalty' && e.teamId === home.id).reduce((a, e) => a + (e.minutes || 2), 0);
+        const statLine = (label, a, h) => `
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #333;">
+                <span style="color:#888;">${label}</span>
+                <span><strong>${a}</strong> <span style="color:#666;">–</span> <strong>${h}</strong></span>
+            </div>`;
+        return `<div id="gd-final" style="margin-top:20px;padding-top:14px;border-top:1px solid #333;text-align:center;">
+            <p style="color:#888;margin:0;">FINAL${game.ot ? ' (OT)' : ''}</p>
+            <h2 style="margin: 12px 0; font-size: 2em;">${scoreLine(game.awayScore, game.homeScore)}</h2>
+            <table style="width:100%;border-collapse:collapse;font-size:0.9em;margin:0 auto;max-width:340px;">
+                <tr style="color:#888;"><td></td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(away.abbr)}</td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(home.abbr)}</td></tr>
+                ${perRows}
+            </table>
+            <div style="margin-top:14px;text-align:left;max-width:340px;margin-left:auto;margin-right:auto;">
+                ${sh ? statLine('Shots', `${esc(away.abbr)} ${sh.sa}`, `${sh.sh} ${esc(home.abbr)}`) : ''}
+                ${sh ? statLine('Saves', `${esc(away.abbr)} ${sh.va}`, `${sh.vh} ${esc(home.abbr)}`) : ''}
+                ${statLine('Penalty min', `${esc(away.abbr)} ${pimA}`, `${pimH} ${esc(home.abbr)}`)}
+            </div>
+            ${starsHtml()}
+            <button id="gd-continue" class="primary" style="width:auto;margin-top:16px;">Continue</button>
+        </div>`;
+    };
+
+    const paint = () => {
+        const step = steps[stepIdx];
+        // Cumulative scroll: pregame stays on top, each period appends below,
+        // final recap lands at the end. Only the newest block animates.
+        let html = `<div class="dashboard-panel" style="max-width: 760px; margin: 0 auto;">${pregameInner()}`;
+        for (const p of periodSteps) {
+            if (steps.indexOf(p) > stepIdx) break;
+            html += periodHtml(p, steps.indexOf(p) === stepIdx);
+        }
+        if (step === 'final') html += finalHtml();
+        if (step !== 'final') {
+            const nextStep = steps[stepIdx + 1];
+            const label = step === 'pregame' ? 'Drop the Puck'
+                : nextStep === 'final' ? 'Final →' : `${PERIOD_LABEL[nextStep]} →`;
+            html += `<div style="display:flex;gap:10px;justify-content:center;margin-top:22px;">
+                <button id="gd-skip" class="secondary" style="width:auto;">Sim to End</button>
+                <button id="gd-next" class="primary" style="width:auto;">${label}</button>
+            </div>`;
+        }
+        html += `</div>`;
+        container.innerHTML = html;
+
+        const goNext = () => { stepIdx++; paint(); scrollLatest(); };
+        const goEnd = () => { stepIdx = steps.indexOf('final'); paint(); scrollLatest(); };
+        const nx = container.querySelector('#gd-next');
+        if (nx) nx.onclick = goNext;
+        const sk = container.querySelector('#gd-skip');
+        if (sk) sk.onclick = goEnd;
+        const ct = container.querySelector('#gd-continue');
+        if (ct) ct.onclick = () => {
+            // The pre-game snapshot served its purpose; drop it to keep saves lean.
+            update(st => {
+                const g = (st.schedule[weekIndex] || []).find(x => x.homeTeamId === game.homeTeamId && x.awayTeamId === game.awayTeamId);
+                if (g) delete g.preGame;
+            });
+            showScreen('weekly-recap', { weekIndex, confId: params.confId || team.confId });
+        };
+    };
+
+    const scrollLatest = () => {
+        const step = steps[stepIdx];
+        const el = document.getElementById(step === 'final' ? 'gd-final' : `gd-p${step}`);
+        if (el) el.scrollIntoView({ block: 'start' });
+    };
+
 
     paint();
 }

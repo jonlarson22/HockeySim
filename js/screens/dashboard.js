@@ -34,7 +34,7 @@ export function render(container) {
         return `<li${mine}><span style="font-size:0.9em;">#${i + 1} ${esc(t.abbr || t.name)}</span> <span style="float:right;color:#888;font-size:0.9em;">${t.wins || 0}-${t.losses || 0}-${t.otl || 0}</span></li>`;
     }).join('');
 
-    const confOptions = conferences.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    const confOptions = [...conferences].sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
 
     container.innerHTML = `
         <div class="dashboard-grid">
