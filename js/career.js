@@ -135,10 +135,15 @@ export function jobOffers(state) {
         .slice(0, 3);
 }
 
-// Openings for a fired coach: back to the tier-3 board.
+// Openings for a fired coach: you start over somewhere worse than where
+// you got bounced. Fired from the basement? The basement is all that's left.
 export function firedOpenings(state) {
-    return state.leagueTeams
-        .filter(t => t.prestige <= 59)
-        .sort(() => 0.5 - Math.random())
-        .slice(0, Math.floor(Math.random() * 2) + 2);
+    const oldTeam = state.leagueTeams.find(t => t.id === state.teamId);
+    const oldPrestige = oldTeam ? oldTeam.prestige : 60;
+    let pool = state.leagueTeams.filter(t => t.id !== state.teamId && t.prestige < oldPrestige);
+    if (!pool.length) {
+        pool = state.leagueTeams.filter(t => t.id !== state.teamId)
+            .sort((a, b) => a.prestige - b.prestige).slice(0, 5);
+    }
+    return pool.sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 2) + 2);
 }
