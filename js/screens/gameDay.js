@@ -356,7 +356,7 @@ export function render(container, params) {
             <table style="width:100%;border-collapse:collapse;font-size:0.9em;margin:0 auto;max-width:340px;">
                 <tr style="color:#888;"><td></td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(away.abbr)}</td><td style="text-align:center;font-weight:bold;color:#fff;">${esc(home.abbr)}</td></tr>
                 ${perRows}
-                <tr><td colspan="3" style="padding:10px 8px 2px;color:#888;font-size:0.85em;text-align:left;border-top:1px solid #333;">Team Stats</td></tr>
+                <tr><td colspan="3" style="padding:10px 8px 2px;color:#fff;font-size:0.85em;font-weight:bold;text-align:left;border-top:1px solid #333;">Team Stats</td></tr>
                 ${sh ? statRow('Shots', sh.sa, sh.sh) : ''}
                 ${sh ? statRow('Saves', sh.va, sh.vh) : ''}
                 ${statRow('PIM', pimA, pimH)}

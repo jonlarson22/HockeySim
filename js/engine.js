@@ -454,18 +454,19 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
         const scorer = weightedScorer(skaters) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
         const a1 = Math.random() < 0.85 ? weightedScorer(skaters, [scorer.id]) : null;
         const a2 = a1 && Math.random() < 0.6 ? weightedScorer(skaters, [scorer.id, a1.id]) : null;
+        // Valid times: 0:00-19:59 for regulation, 0:00-4:59 for OT (5-min sudden death).
+        const maxMin = period === 4 ? 5 : 20;
         events.push({
             period,
-            minute: Math.floor(Math.random() * 20) + 1,
+            minute: Math.floor(Math.random() * maxMin),
             second: Math.floor(Math.random() * 60),
             teamId: team.id,
             scorer: `${scorer.firstName} ${scorer.lastName}`,
             scorerId: scorer.id,
             assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`),
             assistIds: [a1, a2].filter(Boolean).map(a => a.id),
-            // ~25% of regulation goals come on the power play. Pure label —
-            // the final score was drawn before this runs. No PP in OT (3v3).
-            isPP: period < 4 && Math.random() < 0.25
+            // PP/SH labeled by detection after penalties are generated. No PP in OT (3v3).
+            isPP: false
         });
     };
 
@@ -515,35 +516,22 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
         const n = randomInt(3, 7);
         for (let i = 0; i < n; i++) {
             takePenalty(team, skaters, 1 + Math.floor(Math.random() * 3),
-                Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 60));
+                Math.floor(Math.random() * 20), Math.floor(Math.random() * 60));
         }
     }
-    // Every power-play goal gets a preceding penalty so the story coheres.
-    for (const g of events.filter(e => e.isPP)) {
-        const oppTeam = g.teamId === homeTeam.id ? awayTeam : homeTeam;
-        const oppSkaters = g.teamId === homeTeam.id ? awaySkaters : homeSkaters;
+    // Label PP/SH by detection: a goal is a power-play goal if scored while an
+    // opponent's 2-min penalty was active (<120s after it started, same period).
+    // It's shorthanded if scored while the scorer's own penalty was active.
+    // This guarantees the label always matches the game story.
+    for (const g of events) {
+        if (g.period >= 4) continue; // no PP/SH in OT
         const gt = g.minute * 60 + g.second;
-        const hasCause = penalties.some(p => p.teamId === oppTeam.id && p.period === g.period &&
-            (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) <= 300);
-        if (!hasCause) {
-            const pt = Math.max(0, gt - (60 + Math.floor(Math.random() * 180)));
-            takePenalty(oppTeam, oppSkaters, g.period, Math.floor(pt / 60), pt % 60);
-        }
-    }
-    // Shorthanded goals: ~6% of non-PP regulation goals. The scoring team was
-    // killing a penalty, so ensure a preceding penalty on THEIR side too.
-    // SH goals count for +/- (only PP goals are excluded).
-    for (const g of events.filter(e => !e.isPP && e.period < 4 && Math.random() < 0.06)) {
-        const ownTeam = g.teamId === homeTeam.id ? homeTeam : awayTeam;
-        const ownSkaters = g.teamId === homeTeam.id ? homeSkaters : awaySkaters;
-        const gt = g.minute * 60 + g.second;
-        const hasCause = penalties.some(p => p.teamId === ownTeam.id && p.period === g.period &&
-            (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) <= 300);
-        if (!hasCause) {
-            const pt = Math.max(0, gt - (60 + Math.floor(Math.random() * 180)));
-            takePenalty(ownTeam, ownSkaters, g.period, Math.floor(pt / 60), pt % 60);
-        }
-        g.isSH = true;
+        const oppActive = penalties.some(p => p.teamId !== g.teamId && p.period === g.period &&
+            (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) < 120);
+        if (oppActive) { g.isPP = true; continue; }
+        const ownActive = penalties.some(p => p.teamId === g.teamId && p.period === g.period &&
+            (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) < 120);
+        if (ownActive) g.isSH = true;
     }
 
     // Chronological order, then attach the running score to each event
