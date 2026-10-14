@@ -3,7 +3,7 @@ import { getRandomFirstName, getRandomLastName, conferences, teams as baseTeams 
 // Designed league-average prestige (the 25–90 spread's center). The offseason
 // peg recenters on this so the league mean can't inflate over the decades.
 const DESIGN_MEAN = baseTeams.reduce((a, t) => a + t.prestige, 0) / baseTeams.length;
-import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole, autoFormDPairs, getDPairs, dPairEffectiveOvr } from './lines.js';
+import { autoFormLines, teamForwardOvr, getLines, lineEffectiveOvr, getRole, autoFormDPairs, getDPairs, dPairEffectiveOvr, effOvr } from './lines.js';
 
 import { 
     generateConferenceQuarterfinals, 
@@ -358,7 +358,7 @@ export function calculateTeamRatings(teamId, gameState) {
         }
     }
     if (wSum > 0) offOvr /= wSum;
-    else offOvr = activeForwards.reduce((sum, p) => sum + p.overall, 0) / (activeForwards.length || 1);
+    else offOvr = activeForwards.reduce((sum, p) => sum + effOvr(p), 0) / (activeForwards.length || 1);
 
     let defOvr = 0;
     const dPairs = getDPairs(activeDefense);
@@ -371,24 +371,24 @@ export function calculateTeamRatings(teamId, gameState) {
         for (let p = 1; p <= 3; p++) {
             const { A, B } = dPairs[p];
             if (A && B) { defOvr += dPairEffectiveOvr(A, B) * dw[p - 1]; dwSum += dw[p - 1]; }
-            else if (A || B) { defOvr += (A || B).overall * dw[p - 1]; dwSum += dw[p - 1]; }
+            else if (A || B) { defOvr += effOvr(A || B) * dw[p - 1]; dwSum += dw[p - 1]; }
         }
         defOvr = dwSum > 0 ? defOvr / dwSum
-            : activeDefense.reduce((sum, p) => sum + p.overall, 0) / (activeDefense.length || 1);
+            : activeDefense.reduce((sum, p) => sum + effOvr(p), 0) / (activeDefense.length || 1);
     } else if (activeDefense.length >= 6) {
-        const g1 = (activeDefense[0].overall + activeDefense[1].overall) / 2;
-        const g2 = (activeDefense[2].overall + activeDefense[3].overall) / 2;
-        const g3 = (activeDefense[4].overall + activeDefense[5].overall) / 2;
+        const g1 = (effOvr(activeDefense[0]) + effOvr(activeDefense[1])) / 2;
+        const g2 = (effOvr(activeDefense[2]) + effOvr(activeDefense[3])) / 2;
+        const g3 = (effOvr(activeDefense[4]) + effOvr(activeDefense[5])) / 2;
         defOvr = (g1 * 0.40) + (g2 * 0.35) + (g3 * 0.25);
     } else {
-        defOvr = activeDefense.reduce((sum, p) => sum + p.overall, 0) / (activeDefense.length || 1);
+        defOvr = activeDefense.reduce((sum, p) => sum + effOvr(p), 0) / (activeDefense.length || 1);
     }
 
     // Starting goalie: the user's pick if healthy, else the first active.
     let goalieOvr = 50;
     if (activeGoalies.length > 0) {
         const starter = activeGoalies.find(g => g.id === team.starterGoalieId) || activeGoalies[0];
-        goalieOvr = starter.overall;
+        goalieOvr = effOvr(starter);
     }
 
     let coachOffBoost = 0;
@@ -571,8 +571,8 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
     }
 
     const activeSkaters = (team) => [
-        ...team.roster.forwards.filter(p => p.status === 'Active Roster' && !p.injuryWeeks),
-        ...team.roster.defensemen.filter(p => p.status === 'Active Roster' && !p.injuryWeeks)
+        ...team.roster.forwards.filter(p => p.status === 'Active Roster' && !p.injuryWeeks && !p.suspWeeks),
+        ...team.roster.defensemen.filter(p => p.status === 'Active Roster' && !p.injuryWeeks && !p.suspWeeks)
     ];
 
     // Plus/minus: even-strength goals only (real hockey skips +/- on power plays).
@@ -594,7 +594,7 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
 
     // Goalie saves: shots faced minus goals allowed. Same shot formula as
     // buildGameShots (goals*7 + 3-8 per period, ~4 periods per game).
-    const getActive = (roster) => roster.filter(p => p.status === 'Active Roster' && !p.injuryWeeks);
+    const getActive = (roster) => roster.filter(p => p.status === 'Active Roster' && !p.injuryWeeks && !p.suspWeeks);
     const homeGoalie = getActive(homeTeam.roster.goalies)[0];
     const awayGoalie = getActive(awayTeam.roster.goalies)[0];
     const homeGoals = events.filter(e => e.teamId === homeTeam.id && e.scorerId && e.scorerId !== 'none').length;
@@ -783,6 +783,39 @@ export function simulateWeek(gameState) {
                         }
                     }
                 }
+            }
+            // Team News sidelines (rest/suspension): same reclaim pattern as injuries.
+            if (player.suspWeeks > 0) {
+                player.suspWeeks--;
+                if (player.suspWeeks === 0) {
+                    delete player.suspWeeks;
+                    if (player.status === 'Practice Squad') {
+                        player.status = 'Active Roster';
+                        if (isUser) {
+                            const slot = player.lineSlot || player.pairSlot;
+                            if (slot) {
+                                const isFwd = !!player.lineSlot;
+                                const pool = isFwd ? roster.forwards : roster.defensemen;
+                                const key = isFwd ? 'lineSlot' : 'pairSlot';
+                                const occupant = pool.find(p =>
+                                    p.id !== player.id && p[key] === slot &&
+                                    p.status === 'Active Roster' && !p.injuryWeeks && !p.suspWeeks);
+                                if (occupant && occupant.tempFill) {
+                                    occupant[key] = null;
+                                    occupant.tempFill = false;
+                                    occupant.status = 'Practice Squad';
+                                } else if (occupant) {
+                                    player[key] = null;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Temporary event boosts tick down.
+            if (player.eventBoost && player.eventBoost.weeks > 0) {
+                player.eventBoost.weeks--;
+                if (player.eventBoost.weeks <= 0) delete player.eventBoost;
             } else if (player.status === 'Active Roster' && Math.random() < 0.02) {
                 player.injuryWeeks = Math.floor(Math.random() * 4) + 1;
                 player.status = 'Practice Squad';

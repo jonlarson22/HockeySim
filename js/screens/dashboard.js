@@ -1,7 +1,8 @@
 // screens/dashboard.js — in-season hub.
 import { getState, getUserTeam, update, persist } from '../store.js';
 import { showScreen } from '../router.js';
-import { simCurrentWeek, goAfterSimWeek } from '../actions.js';
+import { simCurrentWeek, goAfterSimWeek, resolveTeamEvent } from '../actions.js';
+import { getEvent } from '../events.js';
 import { pollScore, TRAINING_FOCUSES } from '../engine.js';
 import { getLines, lineChemistry } from '../lines.js';
 import { dripPerWeek, MAX_RECRUIT_TARGETS } from '../recruiting.js';
@@ -47,6 +48,7 @@ export function render(container) {
                     ${s.pendingRecruitWindow ? `<button id="dash-recruit-window" class="primary" style="width: 100%; margin-bottom: 10px; background: #4ade80; color: #000;">🎯 Recruiting Window (Week ${s.pendingRecruitWindow})</button>` : ''}
                     <button id="dash-schedule" class="secondary" style="width: 100%;">Team Schedule</button>
                 </div>
+                <div id="dash-news"></div>
                 <div class="dashboard-panel">
                     <h2>Team Management</h2>
                     <button id="dash-roster" class="primary" style="width: 100%; margin-bottom: 10px;">View Roster</button>
@@ -140,6 +142,38 @@ export function render(container) {
 
     container.querySelector('#dash-schedule').onclick = () => showScreen('schedule');
     container.querySelector('#dash-save-exit').onclick = () => { persist(); showScreen('menu'); };
+
+    // Team News event card.
+    const paintNews = () => {
+        const st = getState();
+        const box = container.querySelector('#dash-news');
+        if (!box) return;
+        const pending = st.pendingEvent;
+        const lastResult = st.lastEventResult;
+        if (!pending && !lastResult) { box.innerHTML = ''; return; }
+        if (pending) {
+            const ev = getEvent(pending.id);
+            const team = st.leagueTeams.find(t => t.id === st.teamId);
+            const body = ev ? ev.text(team, pending.ctx) : '';
+            const btns = ev && ev.kind === 'decision'
+                ? ev.choices.map((c, i) => `<button data-news-choice="${i}" class="secondary" style="width:100%;margin-top:6px;">${esc(c.label)}</button>`).join('')
+                : `<button data-news-choice="0" class="secondary" style="width:100%;margin-top:6px;">Noted</button>`;
+            box.innerHTML = `<div class="dashboard-panel" style="border:1px solid #fbbf24;">
+                <h2>📰 Team News</h2>
+                <div style="font-weight:bold;margin-bottom:4px;">${esc(ev ? ev.title : 'News')}</div>
+                <div style="color:#aaa;font-size:0.92em;">${esc(body)}</div>
+                ${btns}
+            </div>`;
+            box.querySelectorAll('[data-news-choice]').forEach(b => {
+                b.onclick = () => { resolveTeamEvent(parseInt(b.getAttribute('data-news-choice'), 10)); paintNews(); };
+            });
+        } else {
+            box.innerHTML = `<div class="dashboard-panel" style="border:1px solid #333;">
+                <div style="color:#888;font-size:0.92em;">📰 ${esc(lastResult)}</div>
+            </div>`;
+        }
+    };
+    paintNews();
     container.querySelector('#dash-roster').onclick = () => showScreen('roster');
     container.querySelector('#dash-coach').onclick = () => showScreen('coach-profile');
     container.querySelector('#dash-bracket').onclick = () => showScreen('bracket');

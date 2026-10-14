@@ -30,7 +30,7 @@ export function render(container, params) {
         const windowNum = INSEASON_WINDOW_WEEKS.indexOf(weekNum) + 1;
         const pool = s.prospectPool || [];
         const alloc = s.recruitWeekAlloc || {};
-        const budget = calculateWindowPoints(team, s.coach);
+        const budget = calculateWindowPoints(team, s.coach) + (s.recruitBonusPoints || 0);
         const spent = Object.values(alloc).reduce((a, b) => a + b, 0);
         const pointsLeft = budget - spent;
         const targets = s.recruitTargets || [];
@@ -160,7 +160,7 @@ export function render(container, params) {
                 const id = btn.getAttribute('data-add');
                 const st = getState();
                 const a = st.recruitWeekAlloc || {};
-                const budgetNow = calculateWindowPoints(getUserTeam(), st.coach);
+                const budgetNow = calculateWindowPoints(getUserTeam(), st.coach) + (st.recruitBonusPoints || 0);
                 const spentNow = Object.values(a).reduce((x, y) => x + y, 0);
                 if (budgetNow - spentNow >= STEP) setAlloc(id, (a[id] || 0) + STEP);
             });
@@ -179,7 +179,7 @@ export function render(container, params) {
                 const id = e.target.getAttribute('data-alloc');
                 const st = getState();
                 const a = st.recruitWeekAlloc || {};
-                const budgetNow = calculateWindowPoints(getUserTeam(), st.coach);
+                const budgetNow = calculateWindowPoints(getUserTeam(), st.coach) + (st.recruitBonusPoints || 0);
                 const spentNow = Object.values(a).reduce((x, y) => x + y, 0);
                 const cur = a[id] || 0;
                 let v = Math.floor((parseInt(e.target.value, 10) || 0) / STEP) * STEP;

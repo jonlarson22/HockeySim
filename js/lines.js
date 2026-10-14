@@ -119,11 +119,16 @@ export function dPairChemistry(a, b) {
     return Math.max(-0.05, Math.min(0.05, bonus));
 }
 
+// Effective OVR including temporary event boosts (Team News).
+export function effOvr(p) {
+    return (p.overall || 0) + (p.eventBoost && p.eventBoost.weeks > 0 ? p.eventBoost.ovr : 0);
+}
+
 // Effective OVR for a D pair (average OVR × chemistry).
 export function dPairEffectiveOvr(a, b) {
     const pair = [a, b].filter(Boolean);
     if (!pair.length) return 0;
-    const avg = pair.reduce((s, p) => s + (p.overall || 0), 0) / pair.length;
+    const avg = pair.reduce((s, p) => s + effOvr(p), 0) / pair.length;
     return avg * (1 + dPairChemistry(a, b));
 }
 
@@ -131,7 +136,7 @@ export function dPairEffectiveOvr(a, b) {
 export function lineEffectiveOvr(c, lw, rw) {
     const line = [c, lw, rw].filter(Boolean);
     if (!line.length) return 0;
-    const avg = line.reduce((s, p) => s + (p.overall || 0), 0) / line.length;
+    const avg = line.reduce((s, p) => s + effOvr(p), 0) / line.length;
     return avg * (1 + lineChemistry(c, lw, rw));
 }
 
@@ -203,5 +208,5 @@ export function teamForwardOvr(forwards) {
         if (C && LW && RW) lineOvrs.push(lineEffectiveOvr(C, LW, RW));
     }
     if (lineOvrs.length === 4) return lineOvrs.reduce((s, x) => s + x, 0) / 4;
-    return active.reduce((s, p) => s + (p.overall || 0), 0) / active.length;
+    return active.reduce((s, p) => s + effOvr(p), 0) / active.length;
 }

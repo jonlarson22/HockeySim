@@ -9,6 +9,7 @@ import { generateProspectPool, assignPreferences, processRecruitingWeek, process
 import { fillVacantSlots } from './lines.js';
 import { planTransferPortal, buildTransferPortal, processPortalSubmit } from './portal.js';
 import { conferences } from './data.js';
+import { maybeRollEvent, getEvent } from './events.js';
 
 // Simulates the current week for the whole league.
 // Returns { weekIndex, seasonActive }.
@@ -27,11 +28,12 @@ export function simCurrentWeek() {
         }
         assignPreferences(state.prospectPool, state.leagueTeams, state.teamId, state.coach);
         processInseasonWeek(state);
-        // Recruiting windows (weeks 10/22/34) wait on the dashboard banner —
+        // Recruiting windows (weeks 10/18/26) wait on the dashboard banner —
         // the user watches their game and sets redshirts first, then opens it.
         if (INSEASON_WINDOW_WEEKS.includes(weekIndex + 1)) {
             state.pendingRecruitWindow = weekIndex + 1;
         }
+        maybeRollEvent(state, weekIndex + 1);
     });
     return { weekIndex, seasonActive };
 }
@@ -196,8 +198,31 @@ export function submitRecruitWindow() {
         touched = res.touched;
         state.recruitWeekAlloc = {};
         state.pendingRecruitWindow = null;
+        state.recruitBonusPoints = 0;
     });
     return { touched };
+}
+
+// Resolves the pending Team News event: applies the chosen (or only) effect,
+// stores the result text for the dashboard card, and clears the event.
+export function resolveTeamEvent(choiceIdx) {
+    let result = '';
+    update(state => {
+        const pending = state.pendingEvent;
+        if (!pending) return;
+        const ev = getEvent(pending.id);
+        const team = state.leagueTeams.find(t => t.id === state.teamId);
+        if (!ev || !team) { state.pendingEvent = null; return; }
+        if (ev.kind === 'decision') {
+            const choice = ev.choices[choiceIdx];
+            result = choice ? choice.apply(state, team, pending.ctx) : '';
+        } else {
+            result = ev.apply(state, team, pending.ctx);
+        }
+        state.pendingEvent = null;
+        state.lastEventResult = result;
+    });
+    return result;
 }
 
 // Releases a player from the program (transfer portal). No take-backs.
@@ -263,6 +288,10 @@ function finalizeOffseason(state) {
     state.recruitingWeek = 0;
     state.recruitWeekAlloc = {};
     state.recruitTargets = [];
+    state.pendingEvent = null;
+    state.lastEventResult = null;
+    state.eventsFired = [];
+    state.recruitBonusPoints = 0;
     // Fresh class to court during the new season.
     state.prospectPool = generateProspectPool();
 }
