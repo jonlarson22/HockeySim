@@ -110,8 +110,10 @@ export function generateNationalTournament(gameState) {
     let nationalTeams = [];
 
     // 1. Auto-Bids: Get Conference Champions (10 conferences)
+    const aqIds = [];
     finalGames.forEach(game => {
         const winnerId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
+        aqIds.push(winnerId);
         const winnerTeam = gameState.leagueTeams.find(t => t.id === winnerId);
         nationalTeams.push(winnerTeam);
     });
@@ -150,6 +152,16 @@ export function generateNationalTournament(gameState) {
 
     // Re-sort the final 32 teams purely by poll score to seed them 1 through 32
     nationalTeams.sort((a, b) => getPollScore(b) - getPollScore(a));
+
+    // Selection Sunday data: seed, bid type, and bubble flag per team.
+    const aqSet = new Set(aqIds);
+    const bubbleSet = new Set(bubblePicks.map(t => t.id));
+    gameState.nationalField = nationalTeams.map((t, i) => ({
+        teamId: t.id,
+        seed: i + 1,
+        bid: aqSet.has(t.id) ? 'AQ' : 'at-large',
+        bubble: bubbleSet.has(t.id)
+    }));
 
     // Seed matchups (1v32, 2v31, ..., 16v17)
     let natTourneyGames = [];

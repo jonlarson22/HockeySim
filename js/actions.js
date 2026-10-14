@@ -36,13 +36,18 @@ export function simCurrentWeek() {
     return { weekIndex, seasonActive };
 }
 
-// Routes after a sim: season recap when the year is done, the game-day replay
-// when the user's team played, otherwise the weekly recap. (Recruiting windows
+// Routes after a sim: season recap when the year is done, the Selection Sunday
+// reveal after the week-41 conference finals, the game-day replay when the
+// user's team played, otherwise the weekly recap. (Recruiting windows
 // no longer interrupt — they wait on the dashboard banner.)
 export function goAfterSimWeek(weekIndex, seasonActive) {
     const s = getState();
     const team = s.leagueTeams.find(t => t.id === s.teamId);
     if (!seasonActive) { showScreen('season-recap'); return; }
+    if (weekIndex + 1 === 41 && s.nationalField && s.nationalField.length) {
+        showScreen('selection-sunday', { weekIndex });
+        return;
+    }
     const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
     if (myGame && myGame.events) showScreen('game-day', { weekIndex, confId: team.confId });
     else showScreen('weekly-recap', { weekIndex, confId: team.confId });
