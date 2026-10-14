@@ -3,9 +3,9 @@
 
 import { getState, update } from './store.js';
 import { showScreen } from './router.js';
-import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank, computeWeeklyAwards } from './engine.js';
+import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
 import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
-import { generateProspectPool, assignPreferences, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS, processRecruitVisit } from './recruiting.js';
+import { generateProspectPool, assignPreferences, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
 import { fillVacantSlots } from './lines.js';
 import { planTransferPortal, buildTransferPortal, processPortalSubmit } from './portal.js';
 import { conferences } from './data.js';
@@ -17,19 +17,26 @@ import { evaluateSeasonGoals, applyGoalOutcomes } from './goals.js';
 export function simCurrentWeek() {
     const weekIndex = getState().currentWeek - 1;
     let seasonActive = false;
+    // Don't sim a new week while the user's last game is still unplayed
+    // (e.g. reloaded a save mid-game-day) — route to it instead.
+    {
+        const s = getState();
+        const prevIdx = s.currentWeek - 2;
+        if (prevIdx >= 0) {
+            const pending = (s.schedule[prevIdx] || []).find(g =>
+                (g.homeTeamId === s.teamId || g.awayTeamId === s.teamId) && !g.played);
+            if (pending) {
+                goAfterSimWeek(prevIdx, true);
+                return { weekIndex: prevIdx, seasonActive: true };
+            }
+        }
+    }
     update(state => {
         // Any unopened recruiting window expires when the next week sims.
         state.pendingRecruitWindow = null;
         seasonActive = simulateWeek(state);
-        // Weekly awards (regular season only): F/D/G of the week get +1 OVR
-        // for next week, league-wide.
-        if (weekIndex + 1 <= 28) computeWeeklyAwards(state);
-        // Recruit visit: a targeted prospect may attend a home game.
-        if (weekIndex + 1 <= 28) {
-            const myGame = (state.schedule[weekIndex] || []).find(g =>
-                g.homeTeamId === state.teamId || g.awayTeamId === state.teamId);
-            processRecruitVisit(state, myGame);
-        }
+        // NOTE: weekly awards + recruit visit moved to finalizeLiveGame — they
+        // need the user's live-simmed result, which doesn't exist yet here.
         // In-season recruiting background: lazy pool for migrated saves,
         // then the target-board drip + phantom rival creep.
         if (!state.prospectPool || !state.prospectPool.length) {
@@ -49,8 +56,8 @@ export function simCurrentWeek() {
 }
 
 // Routes after a sim: season recap when the year is done, the Selection Sunday
-// reveal after the week-41 conference finals, the game-day replay when the
-// user's team played, otherwise the weekly recap. (Recruiting windows
+// reveal after the week-31 conference finals, the live game-day sim when the
+// user's game is unplayed, otherwise the weekly recap. (Recruiting windows
 // no longer interrupt — they wait on the dashboard banner.)
 export function goAfterSimWeek(weekIndex, seasonActive) {
     const s = getState();
@@ -61,14 +68,14 @@ export function goAfterSimWeek(weekIndex, seasonActive) {
         return;
     }
     const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
-    // Midseason report card: once, after the week-14 sim, before the replay.
+    // Midseason report card: once, after the week-14 sim, before game day.
     if (weekIndex + 1 === 14 && !s.reportCardShown) {
         update(st => { st.reportCardShown = true; });
         showScreen('report-card', { weekIndex, confId: team.confId,
-            next: (myGame && myGame.events) ? 'game-day' : 'weekly-recap' });
+            next: (myGame && !myGame.played) ? 'game-day' : 'weekly-recap' });
         return;
     }
-    if (myGame && myGame.events) showScreen('game-day', { weekIndex, confId: team.confId });
+    if (myGame && !myGame.played) showScreen('game-day', { weekIndex, confId: team.confId });
     else showScreen('weekly-recap', { weekIndex, confId: team.confId });
 }
 

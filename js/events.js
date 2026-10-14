@@ -274,7 +274,7 @@ export const TEAM_EVENTS = [
         id: 'press_trash', kind: 'decision', title: "Press Conference: Next Week's Matchup",
         eligible: () => true,
         ctx: (t, s) => {
-            const g = (s.schedule[s.currentWeek] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
+            const g = (s.schedule[s.currentWeek - 1] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
             const oppId = g ? (g.homeTeamId === t.id ? g.awayTeamId : g.homeTeamId) : null;
             const opp = oppId ? s.leagueTeams.find(x => x.id === oppId) : null;
             return { oppId, oppName: opp ? opp.name : 'next week\'s opponent' };
@@ -312,13 +312,13 @@ export const TEAM_EVENTS = [
     {
         id: 'press_rivalry', kind: 'decision', title: 'Press Conference: Rivalry Week',
         eligible: (t, s) => {
-            const g = (s.schedule[s.currentWeek] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
+            const g = (s.schedule[s.currentWeek - 1] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
             if (!g) return false;
             const oppId = g.homeTeamId === t.id ? g.awayTeamId : g.homeTeamId;
             return (t.rivals || []).includes(oppId);
         },
         ctx: (t, s) => {
-            const g = (s.schedule[s.currentWeek] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
+            const g = (s.schedule[s.currentWeek - 1] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
             const oppId = g ? (g.homeTeamId === t.id ? g.awayTeamId : g.homeTeamId) : null;
             const opp = oppId ? s.leagueTeams.find(x => x.id === oppId) : null;
             return { oppId, oppName: opp ? opp.name : 'your rival' };

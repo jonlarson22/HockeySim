@@ -16,7 +16,7 @@ import {
     generateNationalChampionship
 } from './tournaments.js';
 
-import { generateProspectPool, calculateRecruitingPoints } from './recruiting.js';
+import { generateProspectPool, calculateRecruitingPoints, processRecruitVisit } from './recruiting.js';
 
 // Helper to generate a random number within a range
 function randomInt(min, max) {
@@ -429,107 +429,74 @@ function weightedForward(forwards, excludeIds = []) {
     return pool[pool.length - 1];
 }
 
-// Builds a period-by-period goal log for an already-simmed game. The final
-// score is drawn exactly as before; this only distributes those goals across
+// Builds a period-by-period goal log for an already-simmed game. The final score
+// is drawn exactly as before; this only distributes those goals across
 // periods and attaches scorer/assist names so the game-day screen can replay
 // the game. Regulation goals go to periods 1-3; the OT winner gets period 4.
-export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT) {
-    const periodWeights = [0.32, 0.34, 0.34];
-    // Forwards drive the offense; defensemen chip in at a reduced weight.
-    // Final scores are drawn before this runs — this only assigns credit.
-    const skaterPool = (team) => [
+
+// --- Shared event builders (used by both the instant AI sim and the live sim) ---
+
+const INFRACTIONS = ['Tripping', 'Hooking', 'Slashing', 'High-sticking', 'Interference',
+    'Roughing', 'Cross-checking', 'Delay of game', 'Too many men', 'Boarding', 'Charging', 'Elbowing'];
+
+// Forwards drive the offense; defensemen chip in at a reduced weight.
+function skaterPoolFor(team) {
+    return [
         ...getActivePlayers(team.roster.forwards).map(p => ({ p, w: p.overall * p.overall })),
         ...getActivePlayers(team.roster.defensemen).map(p => ({ p, w: p.overall * p.overall * 0.25 }))
     ];
-    const homeSkaters = skaterPool(homeTeam);
-    const awaySkaters = skaterPool(awayTeam);
-    const events = [];
+}
 
-    const weightedScorer = (skaters, excludeIds = []) => {
-        const pool = skaters.filter(s => !excludeIds.includes(s.p.id));
-        if (!pool.length) return null;
-        let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
-        for (const s of pool) {
-            r -= s.w;
-            if (r <= 0) return s.p;
-        }
-        return pool[pool.length - 1].p;
-    };
-
-    const makeGoal = (team, skaters, period) => {
-        const scorer = weightedScorer(skaters) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
-        const a1 = Math.random() < 0.85 ? weightedScorer(skaters, [scorer.id]) : null;
-        const a2 = a1 && Math.random() < 0.6 ? weightedScorer(skaters, [scorer.id, a1.id]) : null;
-        // Valid times: 0:00-19:59 for regulation, 0:00-4:59 for OT (5-min sudden death).
-        const maxMin = period === 4 ? 5 : 20;
-        events.push({
-            period,
-            minute: Math.floor(Math.random() * maxMin),
-            second: Math.floor(Math.random() * 60),
-            teamId: team.id,
-            scorer: `${scorer.firstName} ${scorer.lastName}`,
-            scorerId: scorer.id,
-            assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`),
-            assistIds: [a1, a2].filter(Boolean).map(a => a.id),
-            // PP/SH labeled by detection after penalties are generated. No PP in OT (3v3).
-            isPP: false
-        });
-    };
-
-    const dealGoals = (team, skaters, count) => {
-        for (let i = 0; i < count; i++) {
-            const roll = Math.random();
-            let period = 3, acc = 0;
-            for (let p = 0; p < 3; p++) {
-                acc += periodWeights[p];
-                if (roll <= acc) { period = p + 1; break; }
-            }
-            makeGoal(team, skaters, period);
-        }
-    };
-
-    // The OT goal was already counted in the final score; re-deal it as period 4.
-    const homeOT = wentOT && homeGoals > awayGoals ? 1 : 0;
-    const awayOT = wentOT && awayGoals > homeGoals ? 1 : 0;
-    dealGoals(homeTeam, homeSkaters, homeGoals - homeOT);
-    dealGoals(awayTeam, awaySkaters, awayGoals - awayOT);
-
-    if (wentOT) {
-        const winner = homeGoals > awayGoals ? homeTeam : awayTeam;
-        makeGoal(winner, winner === homeTeam ? homeSkaters : awaySkaters, 4);
+function weightedScorerFrom(skaters, excludeIds = []) {
+    const pool = skaters.filter(s => !excludeIds.includes(s.p.id));
+    if (!pool.length) return null;
+    let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
+    for (const s of pool) {
+        r -= s.w;
+        if (r <= 0) return s.p;
     }
+    return pool[pool.length - 1].p;
+}
 
-    // Chronological order, then attach the running score to each event.
-    // Penalties become visible events (they used to be invisible PIM rolls).
-    // 3-7 minors per team per game, Power Forwards take more. Pure annotation.
-    const INFRACTIONS = ['Tripping', 'Hooking', 'Slashing', 'High-sticking', 'Interference',
-        'Roughing', 'Cross-checking', 'Delay of game', 'Too many men', 'Boarding', 'Charging', 'Elbowing'];
-    const penalties = [];
-    const takePenalty = (team, skaters, period, minute, second) => {
-        if (!skaters.length) return;
-        const pool = skaters.map(s => ({ p: s.p, w: getRole(s.p) === 'Power Forward' ? 2 : 1 }));
-        let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
-        let perp = pool[pool.length - 1].p;
-        for (const s of pool) { r -= s.w; if (r <= 0) { perp = s.p; break; } }
-        penalties.push({
-            kind: 'penalty', period, minute, second, teamId: team.id,
-            playerId: perp.id, player: `${perp.firstName} ${perp.lastName}`,
-            infraction: INFRACTIONS[Math.floor(Math.random() * INFRACTIONS.length)],
-            minutes: 2,
-        });
+function makeGoalEvent(team, skaters, period, minuteMin, minuteMax, extra = {}) {
+    const scorer = weightedScorerFrom(skaters) || { id: 'none', firstName: 'Unknown', lastName: 'Player' };
+    const a1 = Math.random() < 0.85 ? weightedScorerFrom(skaters, [scorer.id]) : null;
+    const a2 = a1 && Math.random() < 0.6 ? weightedScorerFrom(skaters, [scorer.id, a1.id]) : null;
+    const span = Math.max(1, minuteMax - minuteMin);
+    return {
+        period,
+        minute: minuteMin + Math.floor(Math.random() * span),
+        second: Math.floor(Math.random() * 60),
+        teamId: team.id,
+        scorer: `${scorer.firstName} ${scorer.lastName}`,
+        scorerId: scorer.id,
+        assists: [a1, a2].filter(Boolean).map(a => `${a.firstName} ${a.lastName}`),
+        assistIds: [a1, a2].filter(Boolean).map(a => a.id),
+        // PP/SH labeled by detection after penalties are generated. No PP in OT (3v3).
+        isPP: false,
+        ...extra
     };
-    for (const [team, skaters] of [[homeTeam, homeSkaters], [awayTeam, awaySkaters]]) {
-        const n = randomInt(3, 7);
-        for (let i = 0; i < n; i++) {
-            takePenalty(team, skaters, 1 + Math.floor(Math.random() * 3),
-                Math.floor(Math.random() * 20), Math.floor(Math.random() * 60));
-        }
-    }
-    // Label PP/SH by detection: a goal is a power-play goal if scored while an
-    // opponent's 2-min penalty was active (<120s after it started, same period).
-    // It's shorthanded if scored while the scorer's own penalty was active.
-    // This guarantees the label always matches the game story.
-    for (const g of events) {
+}
+
+function makePenaltyEvent(team, skaters, period, minute, second) {
+    if (!skaters.length) return null;
+    const pool = skaters.map(s => ({ p: s.p, w: getRole(s.p) === 'Power Forward' ? 2 : 1 }));
+    let r = Math.random() * pool.reduce((a, s) => a + s.w, 0);
+    let perp = pool[pool.length - 1].p;
+    for (const s of pool) { r -= s.w; if (r <= 0) { perp = s.p; break; } }
+    return {
+        kind: 'penalty', period, minute, second, teamId: team.id,
+        playerId: perp.id, player: `${perp.firstName} ${perp.lastName}`,
+        infraction: INFRACTIONS[Math.floor(Math.random() * INFRACTIONS.length)],
+        minutes: 2,
+    };
+}
+
+// Label PP/SH by detection: a goal is a power-play goal if scored while an
+// opponent's 2-min penalty was active (<120s after it started, same period).
+// It's shorthanded if scored while the scorer's own penalty was active.
+function labelPeriodPP(goals, penalties) {
+    for (const g of goals) {
         if (g.period >= 4) continue; // no PP/SH in OT
         const gt = g.minute * 60 + g.second;
         const oppActive = penalties.some(p => p.teamId !== g.teamId && p.period === g.period &&
@@ -539,19 +506,205 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
             (p.minute * 60 + p.second) < gt && gt - (p.minute * 60 + p.second) < 120);
         if (ownActive) g.isSH = true;
     }
+}
 
-    // Chronological order, then attach the running score to each event
-    // (penalties don't change the score).
-    const all = [...events.map(e => ({ ...e, kind: 'goal' })), ...penalties];
-    all.sort((a, b) => a.period - b.period || a.minute - b.minute || a.second - b.second);
+function attachRunningScore(events, homeTeamId) {
+    const sorted = [...events].sort((a, b) => a.period - b.period || a.minute - b.minute || a.second - b.second);
     let hs = 0, as = 0;
-    all.forEach(e => {
-        if (e.kind === 'goal') { if (e.teamId === homeTeam.id) hs++; else as++; }
+    for (const e of sorted) {
+        if (e.kind === 'goal') { if (e.teamId === homeTeamId) hs++; else as++; }
         e.homeScore = hs;
         e.awayScore = as;
-    });
+    }
+    return sorted;
+}
 
-    return all;
+// Builds all events for one period: goals + penalties, PP/SH labeled,
+// chronologically sorted with running scores attached.
+export function buildPeriodEvents(homeTeam, awayTeam, homeGoals, awayGoals, period, minuteMin = 0, minuteMax = 20, enInfo = null) {
+    const homeSkaters = skaterPoolFor(homeTeam);
+    const awaySkaters = skaterPoolFor(awayTeam);
+    const goals = [];
+    // Empty-net goals (from a pulled goalie) are marked so the UI can call them out.
+    let enLeft = enInfo ? enInfo.count : 0;
+    const enTeam = enInfo ? enInfo.teamId : null;
+    for (let i = 0; i < homeGoals; i++) {
+        const isEN = enTeam === awayTeam.id && enLeft > 0;
+        if (isEN) enLeft--;
+        goals.push(makeGoalEvent(homeTeam, homeSkaters, period, minuteMin, minuteMax, isEN ? { isEN: true } : {}));
+    }
+    for (let i = 0; i < awayGoals; i++) {
+        const isEN = enTeam === homeTeam.id && enLeft > 0;
+        if (isEN) enLeft--;
+        goals.push(makeGoalEvent(awayTeam, awaySkaters, period, minuteMin, minuteMax, isEN ? { isEN: true } : {}));
+    }
+    // 3-7 minors per team per game, spread across periods (1-2 in P1/P2, 1-3 in P3).
+    const penalties = [];
+    const n = period === 3 ? randomInt(1, 3) : randomInt(1, 2);
+    for (const [team, skaters] of [[homeTeam, homeSkaters], [awayTeam, awaySkaters]]) {
+        for (let i = 0; i < n; i++) {
+            const ev = makePenaltyEvent(team, skaters, period,
+                minuteMin + Math.floor(Math.random() * Math.max(1, minuteMax - minuteMin)), Math.floor(Math.random() * 60));
+            if (ev) penalties.push(ev);
+        }
+    }
+    labelPeriodPP(goals, penalties);
+    return attachRunningScore(
+        [...goals.map(g => ({ ...g, kind: 'goal' })), ...penalties], homeTeam.id);
+}
+
+export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT) {
+    // Deal the pre-drawn regulation goals across periods (weights unchanged),
+    // then build each period's events with the shared builders.
+    const periodWeights = [0.32, 0.34, 0.34];
+    const per = { 1: { h: 0, a: 0 }, 2: { h: 0, a: 0 }, 3: { h: 0, a: 0 } };
+    const dealGoals = (count, side) => {
+        for (let i = 0; i < count; i++) {
+            const roll = Math.random();
+            let period = 3, acc = 0;
+            for (let p = 0; p < 3; p++) {
+                acc += periodWeights[p];
+                if (roll <= acc) { period = p + 1; break; }
+            }
+            per[period][side]++;
+        }
+    };
+    const homeOT = wentOT && homeGoals > awayGoals ? 1 : 0;
+    const awayOT = wentOT && awayGoals > homeGoals ? 1 : 0;
+    dealGoals(homeGoals - homeOT, 'h');
+    dealGoals(awayGoals - awayOT, 'a');
+
+    let all = [];
+    for (let p = 1; p <= 3; p++) {
+        all = all.concat(buildPeriodEvents(homeTeam, awayTeam, per[p].h, per[p].a, p, 0, 20));
+    }
+    if (wentOT) {
+        const winner = homeGoals > awayGoals ? homeTeam : awayTeam;
+        const wh = winner === homeTeam ? 1 : 0, wa = winner === awayTeam ? 1 : 0;
+        all = all.concat(buildPeriodEvents(homeTeam, awayTeam, wh, wa, 4, 0, 5));
+    }
+    return attachRunningScore(all, homeTeam.id);
+}
+
+// --- Live sim (user games, driven period-by-period by the game-day screen) ---
+//
+// Unlike the instant sim (which draws the final score first, then deals
+// events), the live sim draws each period's goals from the same expected-goals
+// formula, split per period. Intermission adjustments (line swaps, goalie
+// changes, timeouts) flow through calculateTeamRatings, so they genuinely
+// change what happens next.
+
+// Sims one slice of a period [minuteMin, minuteMax) and appends its events to
+// game.events / game.homeScore / game.awayScore. opts.emptyNetFor = teamId
+// pulls that team's goalie: 6v5 attack for them, empty-net chances against.
+export function simLivePeriod(gameState, game, period, minuteMin = 0, minuteMax = 20, opts = {}) {
+    const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+    const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+    const hr = calculateTeamRatings(homeTeam.id, gameState);
+    const ar = calculateTeamRatings(awayTeam.id, gameState);
+    // Timeout boost: +1 across the board for one period, then consumed.
+    for (const [r, t] of [[hr, homeTeam], [ar, awayTeam]]) {
+        const b = t.liveBoost || 0;
+        r.offense += b; r.defense += b; r.goalie += b;
+        t.liveBoost = 0;
+    }
+    const hOff = hr.offense + hr.coachOffBoost + 2;
+    const hDef = (hr.defense * 0.5) + (hr.goalie * 0.5) + hr.coachDefBoost + 2;
+    const aOff = ar.offense + ar.coachOffBoost;
+    const aDef = (ar.defense * 0.5) + (ar.goalie * 0.5) + ar.coachDefBoost;
+    // Same shape as the instant sim (2.5 base, /8 scaling), scaled to the slice.
+    const frac = (minuteMax - minuteMin) / 20 / 3;
+    const draw = (exp, noise) => Math.max(0, Math.round(exp + (Math.random() * noise - noise / 2)));
+
+    let hg, ag, enInfo = null;
+    if (opts.emptyNetFor) {
+        // 6v5: pulling team gets a real chance, the leader gets empty-net looks.
+        const pullingHome = opts.emptyNetFor === homeTeam.id;
+        const atk = draw(0.5, 1.0);
+        const en = draw(0.35, 0.8);
+        hg = pullingHome ? atk : en;
+        ag = pullingHome ? en : atk;
+        enInfo = { teamId: pullingHome ? awayTeam.id : homeTeam.id, count: en };
+    } else {
+        hg = draw((2.5 + (hOff - aDef) / 8) * frac, 1.1);
+        ag = draw((2.5 + (aOff - hDef) / 8) * frac, 1.1);
+    }
+    const events = buildPeriodEvents(homeTeam, awayTeam, hg, ag, period, minuteMin, minuteMax, enInfo);
+    game.events = [...(game.events || []), ...events];
+    game.homeScore = (game.homeScore || 0) + hg;
+    game.awayScore = (game.awayScore || 0) + ag;
+    game.events = attachRunningScore(game.events, homeTeam.id);
+    return { hg, ag, events };
+}
+
+// Sudden-death OT: weighted coin flip by ratings edge (mirrors the instant sim).
+export function simLiveOT(gameState, game) {
+    const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+    const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+    const hr = calculateTeamRatings(homeTeam.id, gameState);
+    const ar = calculateTeamRatings(awayTeam.id, gameState);
+    const hEdge = (hr.offense + hr.coachOffBoost + 2) - ((ar.defense * 0.5) + (ar.goalie * 0.5) + ar.coachDefBoost);
+    const aEdge = (ar.offense + ar.coachOffBoost) - ((hr.defense * 0.5) + (hr.goalie * 0.5) + hr.coachDefBoost + 2);
+    const pHome = Math.min(0.8, Math.max(0.2, 0.5 + (hEdge - aEdge) * 0.15));
+    const homeWins = Math.random() < pHome;
+    const events = buildPeriodEvents(homeTeam, awayTeam, homeWins ? 1 : 0, homeWins ? 0 : 1, 4, 0, 5);
+    game.events = attachRunningScore([...(game.events || []), ...events], homeTeam.id);
+    game.homeScore = (game.homeScore || 0) + (homeWins ? 1 : 0);
+    game.awayScore = (game.awayScore || 0) + (homeWins ? 0 : 1);
+    game.ot = true;
+    return { homeWins, events };
+}
+
+// Records a completed game: stats, standings, rivalry, shots. Shared by the
+// instant sim (AI games) and the live sim (user games).
+export function finalizeGame(gameState, game, homeTeam, awayTeam, events, homeGoals, awayGoals, isOT) {
+    if (accumulateGameStats(homeTeam, awayTeam, events, gameState)) game.rivalry = true;
+    game.homeScore = homeGoals;
+    game.awayScore = awayGoals;
+    game.ot = isOT;
+    game.played = true;
+    if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
+        game.events = events;
+        game.shots = buildGameShots(homeTeam, awayTeam, events);
+    }
+    const isConfGame = game.type === 'conf' || game.type === 'conf_tourney';
+    if (homeGoals > awayGoals) {
+        homeTeam.wins = (homeTeam.wins || 0) + 1;
+        if (isConfGame) homeTeam.confWins = (homeTeam.confWins || 0) + 1;
+        if (isOT) {
+            awayTeam.otl = (awayTeam.otl || 0) + 1;
+            if (isConfGame) awayTeam.confOtl = (awayTeam.confOtl || 0) + 1;
+        } else {
+            awayTeam.losses = (awayTeam.losses || 0) + 1;
+            if (isConfGame) awayTeam.confLosses = (awayTeam.confLosses || 0) + 1;
+        }
+    } else {
+        awayTeam.wins = (awayTeam.wins || 0) + 1;
+        if (isConfGame) awayTeam.confWins = (awayTeam.confWins || 0) + 1;
+        if (isOT) {
+            homeTeam.otl = (homeTeam.otl || 0) + 1;
+            if (isConfGame) homeTeam.confOtl = (homeTeam.confOtl || 0) + 1;
+        } else {
+            homeTeam.losses = (homeTeam.losses || 0) + 1;
+            if (isConfGame) homeTeam.confLosses = (homeTeam.confLosses || 0) + 1;
+        }
+    }
+}
+
+// Finalizes the user's live-simmed game, then runs the week-end awards and
+// recruit visit that used to run in simCurrentWeek (they need the final score).
+export function finalizeLiveGame(gameState, game) {
+    if (game.played) return;
+    const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
+    const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
+    const events = game.events || [];
+    finalizeGame(gameState, game, homeTeam, awayTeam, events,
+        game.homeScore || 0, game.awayScore || 0, !!game.ot);
+    const weekNum = game.week || gameState.currentWeek - 1;
+    if (weekNum <= 28) {
+        computeWeeklyAwards(gameState);
+        processRecruitVisit(gameState, game);
+    }
 }
 
 // Adds G/A from a game's events to the roster players' season totals.
@@ -733,10 +886,17 @@ export function simulateWeek(gameState) {
 
         const homeTeam = gameState.leagueTeams.find(t => t.id === game.homeTeamId);
         const awayTeam = gameState.leagueTeams.find(t => t.id === game.awayTeamId);
-        if (!game.preGame && (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId)) {
-            game.preGame = { home: snapTeam(homeTeam), away: snapTeam(awayTeam) };
+        // The user's game sims live on the game-day screen, period by period —
+        // only stamp ranks here, everything else happens at finalization.
+        if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
+            game.events = [];
+            game.homeScore = 0;
+            game.awayScore = 0;
+            game.ot = false;
+            game.played = false;
+            game.liveStep = 'pregame';
+            return;
         }
-        const isConfGame = game.type === 'conf' || game.type === 'conf_tourney';
 
         const homeRatings = calculateTeamRatings(homeTeam.id, gameState);
         const awayRatings = calculateTeamRatings(awayTeam.id, gameState);
@@ -764,43 +924,10 @@ export function simulateWeek(gameState) {
             else awayGoals++;
         }
 
-        game.homeScore = homeGoals;
-        game.awayScore = awayGoals;
-        game.ot = isOT;
-        game.played = true;
-
         // Goal events feed season stats league-wide; the event objects are
         // kept only for the user's game (drives the game-day screen).
         const events = buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, isOT);
-        if (accumulateGameStats(homeTeam, awayTeam, events, gameState)) game.rivalry = true;
-        if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
-            game.events = events;
-            game.shots = buildGameShots(homeTeam, awayTeam, events);
-        }
-
-        if (homeGoals > awayGoals) {
-            homeTeam.wins = (homeTeam.wins || 0) + 1;
-            if (isConfGame) homeTeam.confWins = (homeTeam.confWins || 0) + 1;
-
-            if (isOT) {
-                awayTeam.otl = (awayTeam.otl || 0) + 1;
-                if (isConfGame) awayTeam.confOtl = (awayTeam.confOtl || 0) + 1;
-            } else {
-                awayTeam.losses = (awayTeam.losses || 0) + 1;
-                if (isConfGame) awayTeam.confLosses = (awayTeam.confLosses || 0) + 1;
-            }
-        } else {
-            awayTeam.wins = (awayTeam.wins || 0) + 1;
-            if (isConfGame) awayTeam.confWins = (awayTeam.confWins || 0) + 1;
-
-            if (isOT) {
-                homeTeam.otl = (homeTeam.otl || 0) + 1;
-                if (isConfGame) homeTeam.confOtl = (homeTeam.confOtl || 0) + 1;
-            } else {
-                homeTeam.losses = (homeTeam.losses || 0) + 1;
-                if (isConfGame) homeTeam.confLosses = (homeTeam.confLosses || 0) + 1;
-            }
-        }
+        finalizeGame(gameState, game, homeTeam, awayTeam, events, homeGoals, awayGoals, isOT);
     });
     
     // --- INJURY MANAGEMENT (all teams) & PROGRESSION (user team) ---
