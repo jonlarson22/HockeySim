@@ -26,7 +26,7 @@ export function render(container, params) {
     const snubs = s.tourneySnubs || [];
     const weekIndex = params.weekIndex;
 
-    // The user's conference final, if they played in one (week 41).
+    // The user's conference final, if they played in one (week 31).
     const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
     let finalCard = '';
     if (myGame && myGame.played) {

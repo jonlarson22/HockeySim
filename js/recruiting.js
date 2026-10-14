@@ -223,7 +223,7 @@ export function processRecruitingWeek(state, userAllocations) {
 // positioning for the offseason battle, which reuses the pool (with turnover).
 
 // 1-based weeks when a recruiting window opens (regular season runs 1-38).
-export const INSEASON_WINDOW_WEEKS = [10, 22, 34];
+export const INSEASON_WINDOW_WEEKS = [10, 18, 26];
 export const MAX_RECRUIT_TARGETS = 5;
 // Share of the pool turned over when the offseason begins (>=85% retained).
 export const POOL_TURNOVER_FRACTION = 0.15;

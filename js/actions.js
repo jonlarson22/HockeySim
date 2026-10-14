@@ -44,7 +44,7 @@ export function goAfterSimWeek(weekIndex, seasonActive) {
     const s = getState();
     const team = s.leagueTeams.find(t => t.id === s.teamId);
     if (!seasonActive) { showScreen('season-recap'); return; }
-    if (weekIndex + 1 === 41 && s.nationalField && s.nationalField.length) {
+    if (weekIndex + 1 === 31 && s.nationalField && s.nationalField.length) {
         showScreen('selection-sunday', { weekIndex });
         return;
     }

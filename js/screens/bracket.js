@@ -33,7 +33,7 @@ export function render(container) {
     const team = getUserTeam();
     const confId = team ? team.confId : conferences[0].id;
     const confName = conferences.find(c => c.id === confId).name;
-    const isBeyondConference = s.currentWeek >= 42;
+    const isBeyondConference = s.currentWeek >= 32;
 
     let html = isBeyondConference
         ? `<h2>National Championship Bracket</h2>`
@@ -41,11 +41,11 @@ export function render(container) {
 
     if (isBeyondConference) {
         const rounds = [
-            { week: 42, name: 'Round of 32', seeds: [[1,32],[2,31],[3,30],[4,29],[5,28],[6,27],[7,26],[8,25],[9,24],[10,23],[11,22],[12,21],[13,20],[14,19],[15,18],[16,17]] },
-            { week: 43, name: 'Round of 16', seeds: [[1,16],[2,15],[3,14],[4,13],[5,12],[6,11],[7,10],[8,9]] },
-            { week: 44, name: 'Quarterfinals', seeds: [[1,8],[2,7],[3,6],[4,5]] },
-            { week: 45, name: 'Semifinals', seeds: [[1,4],[2,3]] },
-            { week: 46, name: 'Championship', seeds: [[1,2]] }
+            { week: 32, name: 'Round of 32', seeds: [[1,32],[2,31],[3,30],[4,29],[5,28],[6,27],[7,26],[8,25],[9,24],[10,23],[11,22],[12,21],[13,20],[14,19],[15,18],[16,17]] },
+            { week: 33, name: 'Round of 16', seeds: [[1,16],[2,15],[3,14],[4,13],[5,12],[6,11],[7,10],[8,9]] },
+            { week: 34, name: 'Quarterfinals', seeds: [[1,8],[2,7],[3,6],[4,5]] },
+            { week: 35, name: 'Semifinals', seeds: [[1,4],[2,3]] },
+            { week: 36, name: 'Championship', seeds: [[1,2]] }
         ];
         rounds.forEach(round => {
             const games = (s.schedule[round.week - 1] || []).filter(g => g.type === 'national_tourney' || g.isNational);
@@ -67,9 +67,9 @@ export function render(container) {
         });
     } else {
         const rounds = [
-            { week: 39, name: 'Quarterfinals' },
-            { week: 40, name: 'Semifinals' },
-            { week: 41, name: 'Finals' }
+            { week: 29, name: 'Quarterfinals' },
+            { week: 30, name: 'Semifinals' },
+            { week: 31, name: 'Finals' }
         ];
         let started = false;
         rounds.forEach(round => {

@@ -257,7 +257,7 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
 
     // --- PHASE 2: CONFERENCE GAMES (Weeks 11 - 38) ---
     let conferenceWeeks = {};
-    for (let w = 11; w <= 38; w++) {
+    for (let w = 11; w <= 28; w++) {
         conferenceWeeks[w] = [];
     }
 
@@ -294,16 +294,14 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
         let fullConferenceMatchups = [];
         rounds.forEach(round => round.forEach(p => fullConferenceMatchups.push({ home: p.home, away: p.away })));
         rounds.forEach(round => round.forEach(p => fullConferenceMatchups.push({ home: p.away, away: p.home })));
-        rounds.forEach(round => round.forEach(p => fullConferenceMatchups.push({ home: p.home, away: p.away })));
-        rounds.forEach(round => round.forEach(p => fullConferenceMatchups.push({ home: p.away, away: p.home })));
 
         let currentWeekOffset = 11;
         fullConferenceMatchups.forEach((matchup, idx) => {
             let roundIndex = Math.floor(idx / (n / 2));
             let assignedWeek = 11 + roundIndex; 
             
-            if (assignedWeek <= 38) {
-                while (assignedWeek <= 38) {
+            if (assignedWeek <= 28) {
+                while (assignedWeek <= 28) {
                     let conflict = conferenceWeeks[assignedWeek].some(g => 
                         g.homeTeamId === matchup.home.id || g.awayTeamId === matchup.home.id ||
                         g.homeTeamId === matchup.away.id || g.awayTeamId === matchup.away.id
@@ -312,7 +310,7 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
                     assignedWeek++;
                 }
 
-                if (assignedWeek <= 38) {
+                if (assignedWeek <= 28) {
                     conferenceWeeks[assignedWeek].push({
                         week: assignedWeek,
                         type: 'conf',
@@ -328,7 +326,7 @@ export function generateSeasonSchedule(leagueTeams, conferences) {
         });
     });
 
-    for (let w = 11; w <= 38; w++) {
+    for (let w = 11; w <= 28; w++) {
         schedule.push(conferenceWeeks[w] || []);
     }
 
@@ -845,14 +843,14 @@ export function simulateWeek(gameState) {
     gameState.currentWeek++;
 
     // TRIGGER TOURNAMENTS
-    if (gameState.currentWeek === 39) generateConferenceQuarterfinals(gameState);
-    if (gameState.currentWeek === 40) generateConferenceSemifinals(gameState);
-    if (gameState.currentWeek === 41) generateConferenceFinals(gameState);
-    if (gameState.currentWeek === 42) generateNationalTournament(gameState);
-    if (gameState.currentWeek === 43) generateNationalRound16(gameState);
-    if (gameState.currentWeek === 44) generateNationalQuarterfinals(gameState);
-    if (gameState.currentWeek === 45) generateNationalSemifinals(gameState);
-    if (gameState.currentWeek === 46) generateNationalChampionship(gameState);
+    if (gameState.currentWeek === 29) generateConferenceQuarterfinals(gameState);
+    if (gameState.currentWeek === 30) generateConferenceSemifinals(gameState);
+    if (gameState.currentWeek === 31) generateConferenceFinals(gameState);
+    if (gameState.currentWeek === 32) generateNationalTournament(gameState);
+    if (gameState.currentWeek === 33) generateNationalRound16(gameState);
+    if (gameState.currentWeek === 34) generateNationalQuarterfinals(gameState);
+    if (gameState.currentWeek === 35) generateNationalSemifinals(gameState);
+    if (gameState.currentWeek === 36) generateNationalChampionship(gameState);
 
     return true;
 }
