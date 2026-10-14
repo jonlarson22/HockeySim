@@ -25,6 +25,8 @@ import * as GameDayScreen from './screens/gameDay.js';
 import * as CarouselScreen from './screens/carousel.js';
 import * as RecruitWindowScreen from './screens/recruitWindow.js';
 import * as SelectionSundayScreen from './screens/selectionSunday.js';
+import * as SeasonGoalsScreen from './screens/seasonGoals.js';
+import * as ReportCardScreen from './screens/reportCard.js';
 import * as PortalScreen from './screens/portal.js';
 
 registerScreen('menu', MenuScreen);
@@ -43,6 +45,8 @@ registerScreen('game-day', GameDayScreen);
 registerScreen('carousel', CarouselScreen);
 registerScreen('recruit-window', RecruitWindowScreen);
 registerScreen('selection-sunday', SelectionSundayScreen);
+registerScreen('season-goals', SeasonGoalsScreen);
+registerScreen('report-card', ReportCardScreen);
 registerScreen('portal', PortalScreen);
 
 showScreen('menu');

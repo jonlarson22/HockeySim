@@ -269,6 +269,99 @@ export const TEAM_EVENTS = [
         text: () => 'A program legend drops by practice.',
         apply: (s, t, c) => { c.ids.forEach(id => { const p = findP(t, id); if (p) boost(p, 1, 1); }); return 'The old stories have three players buzzing (+1 this week).'; },
     },
+    // ——— Press conferences ———
+    {
+        id: 'press_trash', kind: 'decision', title: "Press Conference: Next Week's Matchup",
+        eligible: () => true,
+        ctx: (t, s) => {
+            const g = (s.schedule[s.currentWeek] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
+            const oppId = g ? (g.homeTeamId === t.id ? g.awayTeamId : g.homeTeamId) : null;
+            const opp = oppId ? s.leagueTeams.find(x => x.id === oppId) : null;
+            return { oppId, oppName: opp ? opp.name : 'next week\'s opponent' };
+        },
+        text: c => `A reporter asks about ${c.oppName}. The room goes quiet, waiting for a quote.`,
+        choices: ['Guarantee a win', 'Coach-speak: one game at a time', 'Play the underdog card'],
+        apply: (s, t, c, i) => {
+            const opp = c.oppId ? s.leagueTeams.find(x => x.id === c.oppId) : null;
+            if (i === 0) {
+                userSkaters(t).forEach(p => boost(p, 1, 1));
+                if (opp) allActive(opp).forEach(p => boost(p, 1, 1));
+                return `Bulletin-board material! Your team is fired up (+1) — but so is ${c.oppName} (+1).`;
+            }
+            if (i === 2) { userSkaters(t).forEach(p => boost(p, 1, 1)); return '"Nobody believes in us." Us-against-the-world (+1 this week).'; }
+            return 'You say nothing quotable. The beat writers sigh.';
+        },
+    },
+    {
+        id: 'press_slump', kind: 'decision', title: 'Press Conference: The Slump',
+        eligible: t => userSkaters(t).length > 0,
+        ctx: t => { const p = pick(userSkaters(t)); return { pid: p.id, name: `${p.firstName} ${p.lastName}` }; },
+        text: c => `A reporter asks point-blank: what's wrong with ${c.name}?`,
+        choices: ['Back him publicly', 'Call him out', 'No comment'],
+        apply: (s, t, c, i) => {
+            const p = findP(t, c.pid);
+            if (i === 0) { if (p) boost(p, 1, 2); return `${pname(p)} hears the vote of confidence (+1, 2 weeks).`; }
+            if (i === 1) {
+                if (p) boost(p, -1, 1);
+                userSkaters(t).filter(x => x.id !== c.pid).forEach(x => boost(x, 1, 1));
+                return `The message is sent: ${pname(p)} is benched in the court of public opinion (−1), the room gets the message (+1).`;
+            }
+            return '"We\'re evaluating everything." Nothing changes.';
+        },
+    },
+    {
+        id: 'press_rivalry', kind: 'decision', title: 'Press Conference: Rivalry Week',
+        eligible: (t, s) => {
+            const g = (s.schedule[s.currentWeek] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
+            if (!g) return false;
+            const oppId = g.homeTeamId === t.id ? g.awayTeamId : g.homeTeamId;
+            return (t.rivals || []).includes(oppId);
+        },
+        ctx: (t, s) => {
+            const g = (s.schedule[s.currentWeek] || []).find(x => x.homeTeamId === t.id || x.awayTeamId === t.id);
+            const oppId = g ? (g.homeTeamId === t.id ? g.awayTeamId : g.homeTeamId) : null;
+            const opp = oppId ? s.leagueTeams.find(x => x.id === oppId) : null;
+            return { oppId, oppName: opp ? opp.name : 'your rival' };
+        },
+        text: c => `Rivalry week. The ${c.oppName} game. The whole town is asking about it.`,
+        choices: ['Embrace the hate', 'Downplay it: just another game', 'Guarantee the win'],
+        apply: (s, t, c, i) => {
+            const opp = c.oppId ? s.leagueTeams.find(x => x.id === c.oppId) : null;
+            if (i === 0) {
+                userSkaters(t).forEach(p => boost(p, 1, 1));
+                if (opp) allActive(opp).forEach(p => boost(p, 1, 1));
+                return 'Both fanbases are frothing. Both teams skate harder (+1 each).';
+            }
+            if (i === 2) {
+                userSkaters(t).forEach(p => boost(p, 2, 1));
+                if (opp) allActive(opp).forEach(p => boost(p, 1, 1));
+                return `Bold. Your room believes (+2) — and ${c.oppName} just found their speech (+1).`;
+            }
+            return 'You refuse the bait. Just another game, just another week.';
+        },
+    },
+    {
+        id: 'press_goalie', kind: 'decision', title: 'Press Conference: Goalie Question',
+        eligible: t => t.roster.goalies.filter(g => g.status === 'Active Roster').length >= 2,
+        ctx: t => {
+            const gs = t.roster.goalies.filter(g => g.status === 'Active Roster');
+            const hot = gs.slice().sort((a, b) => (b.seasonWins || 0) - (a.seasonWins || 0))[0];
+            return { gid: hot.id, name: `${hot.firstName} ${hot.lastName}` };
+        },
+        text: c => `Goalie controversy season: a reporter demands to know who's starting. ${c.name} has the most wins.`,
+        choices: ['Name him the starter', 'Keep it open competition', 'No comment'],
+        apply: (s, t, c, i) => {
+            if (i === 0) {
+                const g = findP(t, c.gid);
+                if (g) boost(g, 1, 2);
+                t.roster.goalies.filter(x => x.status === 'Active Roster' && x.id !== c.gid)
+                    .forEach(x => boost(x, -1, 1));
+                return `${pname(g)} gets the net (+1, 2 weeks). The other goalies? Not thrilled (−1).`;
+            }
+            if (i === 1) { allActive(t).filter(p => p.position === 'G').forEach(p => boost(p, 1, 1)); return 'May the best man win. Both goalies sharpen up (+1).'; }
+            return 'You stare the reporter down until he moves on.';
+        },
+    },
 ];
 
 export function getEvent(id) {

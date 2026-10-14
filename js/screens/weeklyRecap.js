@@ -58,6 +58,14 @@ export function render(container, params) {
                 ${[...conferences].sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
             </select>
             <div id="recap-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+            ${(s.weeklyAwards && s.weeklyAwards.week === weekIndex + 1 && s.weeklyAwards.awards.length) ? `
+            <h3 style="margin:18px 0 8px;">🏅 Players of the Week</h3>
+            <div style="font-size:0.9em;">
+                ${s.weeklyAwards.awards.map(a => `<div>${esc(a.label)}: <strong>${esc(a.name)}</strong> <span style="color:#aaa;">(${esc(a.team)})</span> — ${esc(a.stat)}${a.isUser ? ' <span style="color:#4ade80;">YOURS</span>' : ''}</div>`).join('')}
+            </div>` : ''}
+            ${(s.lastVisit && s.lastVisitWeek === weekIndex + 1) ? `
+            <h3 style="margin:18px 0 8px;">🏟️ Recruit Visit</h3>
+            <div style="font-size:0.9em;">${'⭐'.repeat(Math.min(5, s.lastVisit.stars || 0))} <strong>${esc(s.lastVisit.name)}</strong> <span style="color:#aaa;">(${esc(s.lastVisit.pos)})</span> attended the game — ${s.lastVisit.won ? `impressed by the win <span style="color:#4ade80;">(+${s.lastVisit.delta})</span>` : `not impressed by the loss <span style="color:#f87171;">(${s.lastVisit.delta})</span>`}.</div>` : ''}
         </div>`;
 
     const filter = container.querySelector('#recap-filter');

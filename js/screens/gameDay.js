@@ -187,6 +187,7 @@ export function render(container, params) {
             const inner = `
                 <div class="dashboard-panel" style="max-width: 720px; margin: 0 auto;">
                     <p style="color:#888;margin:0;text-align:center;">${scheduleLabel(weekIndex + 1)}</p>
+                    ${game.rivalry ? '<p style="text-align:center;color:#f87171;font-weight:bold;margin:6px 0;">🔥 RIVALRY GAME — winner takes +1 prestige</p>' : ''}
                     <div style="text-align:center;margin:12px 0;">
                         <div style="font-size:1.3em;font-weight:bold;">${esc(away.name)}</div>
                         <div style="color:#888;">${record(awayPre)} · ${ordinal(confRank(awayPre, s))}, ${esc(shortConf(away.confId))}</div>
@@ -362,6 +363,8 @@ export function render(container, params) {
                 ${statRow('PIM', pimA, pimH)}
             </table>
             ${starsHtml()}
+            ${(s.lastVisit && s.lastVisitWeek === weekIndex + 1) ? `
+            <p style="font-size:0.9em;color:#aaa;margin:12px 0 0;">🏟️ ${'⭐'.repeat(Math.min(5, s.lastVisit.stars || 0))} <strong>${esc(s.lastVisit.name)}</strong> (${esc(s.lastVisit.pos)}) was in the building — ${s.lastVisit.won ? `loved the win <span style="color:#4ade80;">(+${s.lastVisit.delta} interest)</span>` : `walked out on a loss <span style="color:#f87171;">(${s.lastVisit.delta} interest)</span>`}.</p>` : ''}
             <button id="gd-continue" class="primary" style="width:auto;margin-top:16px;">Continue</button>
         </div>`;
     };

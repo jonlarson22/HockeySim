@@ -85,6 +85,12 @@ export function render(container) {
                     </div>
                 </div>
             </div>
+            <h3>Season Goals</h3>
+            <div style="font-size: 0.9em; margin-bottom: 10px;">
+                ${(s.seasonGoalResults || []).length ? s.seasonGoalResults.map(g =>
+                    `<div>${g.met ? '✅' : '❌'} ${esc(g.label)} <span style="color:#888;">(${g.tier})</span></div>`
+                ).join('') : '<span style="color:#888;">No goals set this season.</span>'}
+            </div>
             <h3>Season Awards ${myAwards.length ? `<span style="color:var(--accent);">(${myAwards.length} yours!)</span>` : ''}</h3>
             <div style="font-size: 0.9em; max-height: 180px; overflow-y: auto; margin-bottom: 10px;">
                 ${awardsHTML}

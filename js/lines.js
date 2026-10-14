@@ -121,7 +121,13 @@ export function dPairChemistry(a, b) {
 
 // Effective OVR including temporary event boosts (Team News).
 export function effOvr(p) {
-    return (p.overall || 0) + (p.eventBoost && p.eventBoost.weeks > 0 ? p.eventBoost.ovr : 0);
+    const base = (p.overall || 0) + (p.eventBoost && p.eventBoost.weeks > 0 ? p.eventBoost.ovr : 0);
+    // Streak bonus (league-wide, symmetric): skaters 3-game point streak +1,
+    // 5-game +2; goalies 3-game win streak +1.
+    let streak = 0;
+    if (p.position === 'G') streak = (p.winStreak || 0) >= 3 ? 1 : 0;
+    else streak = (p.pointStreak || 0) >= 5 ? 2 : (p.pointStreak || 0) >= 3 ? 1 : 0;
+    return base + streak;
 }
 
 // Effective OVR for a D pair (average OVR × chemistry).

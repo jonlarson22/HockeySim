@@ -1,16 +1,16 @@
 // career.js — expectations, prestige, coach XP, job carousel logic.
 
 const CONF_WEEKS = [
-    { idx: 38, label: 'Quarterfinals' },
-    { idx: 39, label: 'Semifinals' },
-    { idx: 40, label: 'Finals' }
+    { idx: 28, label: 'Quarterfinals' },
+    { idx: 29, label: 'Semifinals' },
+    { idx: 30, label: 'Finals' }
 ];
 const NAT_WEEKS = [
-    { idx: 41, label: 'Round of 32' },
-    { idx: 42, label: 'Round of 16' },
-    { idx: 43, label: 'Quarterfinals' },
-    { idx: 44, label: 'Semifinals' },
-    { idx: 45, label: 'Championship' }
+    { idx: 31, label: 'Round of 32' },
+    { idx: 32, label: 'Round of 16' },
+    { idx: 33, label: 'Quarterfinals' },
+    { idx: 34, label: 'Semifinals' },
+    { idx: 35, label: 'Championship' }
 ];
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

@@ -3,6 +3,7 @@ import { getState, getUserTeam, update, persist } from '../store.js';
 import { showScreen } from '../router.js';
 import { simCurrentWeek, goAfterSimWeek, resolveTeamEvent } from '../actions.js';
 import { getEvent } from '../events.js';
+import { getGoal } from '../goals.js';
 import { pollScore, TRAINING_FOCUSES } from '../engine.js';
 import { getLines, lineChemistry } from '../lines.js';
 import { dripPerWeek, MAX_RECRUIT_TARGETS } from '../recruiting.js';
@@ -23,7 +24,7 @@ export function render(container) {
         if (myGame) {
             const isHome = myGame.homeTeamId === team.id;
             const opp = s.leagueTeams.find(t => t.id === (isHome ? myGame.awayTeamId : myGame.homeTeamId));
-            nextText = `${scheduleLabel(s.currentWeek)} ${isHome ? 'vs.' : '@'} ${opp.abbr || opp.name}`;
+            nextText = `${scheduleLabel(s.currentWeek)} ${isHome ? 'vs.' : '@'} ${opp.abbr || opp.name}${(team.rivals || []).includes(opp.id) ? ' 🔥 Rivalry Game' : ''}`;
         } else {
             nextText = `${scheduleLabel(s.currentWeek)} — BYE`;
         }
@@ -49,6 +50,7 @@ export function render(container) {
                     <button id="dash-schedule" class="secondary" style="width: 100%;">Team Schedule</button>
                 </div>
                 <div id="dash-news"></div>
+                <div id="dash-goals"></div>
                 <div class="dashboard-panel">
                     <h2>Team Management</h2>
                     <button id="dash-roster" class="primary" style="width: 100%; margin-bottom: 10px;">View Roster</button>
@@ -142,6 +144,33 @@ export function render(container) {
 
     container.querySelector('#dash-schedule').onclick = () => showScreen('schedule');
     container.querySelector('#dash-save-exit').onclick = () => { persist(); showScreen('menu'); };
+
+    // Season goals card: pick at week 1, track all season.
+    const paintGoals = () => {
+        const st = getState();
+        const box = container.querySelector('#dash-goals');
+        if (!box) return;
+        if (st.currentWeek > 28 || st.currentWeek < 1) { box.innerHTML = ''; return; }
+        if (!st.seasonGoals || !st.seasonGoals.length) {
+            box.innerHTML = `
+                <div class="dashboard-panel" style="border-color:#4ade80;">
+                    <h2>🎯 Season Goals</h2>
+                    <p style="color:#aaa;font-size:0.9em;">Set 2 goals for this season. They nudge your final grade up or down.</p>
+                    <button id="dash-goals-set" class="primary" style="width:100%;">Set Goals</button>
+                </div>`;
+            box.querySelector('#dash-goals-set').onclick = () => showScreen('season-goals');
+        } else {
+            box.innerHTML = `
+                <div class="dashboard-panel">
+                    <h2>🎯 Season Goals</h2>
+                    ${st.seasonGoals.map(id => {
+                        const g = getGoal(id);
+                        return g ? `<div style="font-size:0.9em;color:#ccc;padding:4px 0;">▫️ ${esc(g.label)}</div>` : '';
+                    }).join('')}
+                </div>`;
+        }
+    };
+    paintGoals();
 
     // Team News event card.
     const paintNews = () => {

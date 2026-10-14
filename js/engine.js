@@ -46,7 +46,7 @@ function focusStatPool(focus, statKeys) {
 
 // NEW: Initialize the league with randomized prestige and zeroed records
 export function initializeLeague(baseTeams) {
-    return baseTeams.map(team => {
+    const teams = baseTeams.map(team => {
         const variance = Math.floor(Math.random() * 7) - 3; // +/-3 starting prestige
         let newPrestige = team.prestige + variance;
         
@@ -65,6 +65,14 @@ export function initializeLeague(baseTeams) {
             roster: generateTeamRoster(newPrestige) 
         };
     });
+    // Rivalries: each team's 2 closest-prestige conference mates.
+    for (const t of teams) {
+        const mates = teams
+            .filter(o => o.id !== t.id && o.confId === t.confId)
+            .sort((a, b) => Math.abs(a.prestige - t.prestige) - Math.abs(b.prestige - t.prestige));
+        t.rivals = mates.slice(0, 2).map(m => m.id);
+    }
+    return teams;
 }
 
 // Generate a single player
@@ -548,7 +556,19 @@ export function buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, wentOT
 
 // Adds G/A from a game's events to the roster players' season totals.
 // Runs for every league game (only the user's game keeps the event objects).
-export function accumulateGameStats(homeTeam, awayTeam, events) {
+export function accumulateGameStats(homeTeam, awayTeam, events, gameState) {
+    // Weekly awards tracking: simulateWeek resets gameState.weeklyTrack each
+    // week; this fills it per game (points for skaters, saves/shots for goalies).
+    const wt = (id) => {
+        if (!gameState || !gameState.weeklyTrack) return null;
+        if (!gameState.weeklyTrack[id]) gameState.weeklyTrack[id] = { pts: 0, saves: 0, shots: 0, team: null, pos: null, name: '' };
+        return gameState.weeklyTrack[id];
+    };
+    const tag = (p, team) => {
+        const w = wt(p.id);
+        if (w) { w.team = team; w.pos = p.position; w.name = `${p.firstName} ${p.lastName}`; w.player = p; }
+        return w;
+    };
     const find = (team, id) => {
         for (const key of ['forwards', 'defensemen', 'goalies']) {
             const p = team.roster[key].find(x => x.id === id);
@@ -563,10 +583,11 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         if (scorer) {
             scorer.seasonGoals = (scorer.seasonGoals || 0) + 1;
             if (e.isPP) scorer.seasonPPG = (scorer.seasonPPG || 0) + 1;
+            const w = tag(scorer, team); if (w) w.pts++;
         }
         for (const aid of e.assistIds || []) {
             const a = find(team, aid);
-            if (a) a.seasonAssists = (a.seasonAssists || 0) + 1;
+            if (a) { a.seasonAssists = (a.seasonAssists || 0) + 1; const w = tag(a, team); if (w) w.pts++; }
         }
     }
 
@@ -592,6 +613,8 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         if (p) p.seasonPIM = (p.seasonPIM || 0) + (e.minutes || 2);
     }
 
+    // Streaks (league-wide, symmetric). Skaters: point streaks — 3 games = +1 OVR,
+    // 5 games = +2 (applied in effOvr). Goalies: 3-game win streak = +1.
     // Goalie saves: shots faced minus goals allowed. Same shot formula as
     // buildGameShots (goals*7 + 3-8 per period, ~4 periods per game).
     const getActive = (roster) => roster.filter(p => p.status === 'Active Roster' && !p.injuryWeeks && !p.suspWeeks);
@@ -603,6 +626,7 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         const sa = awayGoals * 7 + randomInt(12, 32);
         homeGoalie.seasonSaves = (homeGoalie.seasonSaves || 0) + Math.max(0, sa - awayGoals);
         homeGoalie.seasonShotsAgainst = (homeGoalie.seasonShotsAgainst || 0) + sa;
+        const w = tag(homeGoalie, homeTeam); if (w) { w.saves += Math.max(0, sa - awayGoals); w.shots += sa; }
         if (awayGoals === 0) homeGoalie.seasonShutouts = (homeGoalie.seasonShutouts || 0) + 1;
         if (homeGoals > awayGoals) homeGoalie.seasonWins = (homeGoalie.seasonWins || 0) + 1;
         else if (awayGoals > homeGoals) homeGoalie.seasonLosses = (homeGoalie.seasonLosses || 0) + 1;
@@ -611,10 +635,35 @@ export function accumulateGameStats(homeTeam, awayTeam, events) {
         const sa = homeGoals * 7 + randomInt(12, 32);
         awayGoalie.seasonSaves = (awayGoalie.seasonSaves || 0) + Math.max(0, sa - homeGoals);
         awayGoalie.seasonShotsAgainst = (awayGoalie.seasonShotsAgainst || 0) + sa;
+        const w = tag(awayGoalie, awayTeam); if (w) { w.saves += Math.max(0, sa - homeGoals); w.shots += sa; }
         if (homeGoals === 0) awayGoalie.seasonShutouts = (awayGoalie.seasonShutouts || 0) + 1;
         if (awayGoals > homeGoals) awayGoalie.seasonWins = (awayGoalie.seasonWins || 0) + 1;
         else if (homeGoals > awayGoals) awayGoalie.seasonLosses = (awayGoalie.seasonLosses || 0) + 1;
     }
+
+    // Streak updates (league-wide, symmetric). Skaters: point in a game extends
+    // the streak, pointless resets it. Goalies: win extends, loss resets.
+    const pointGetters = new Set();
+    for (const e of events) {
+        if (!e.scorerId || e.scorerId === 'none') continue;
+        pointGetters.add(e.scorerId);
+        for (const aid of e.assistIds || []) pointGetters.add(aid);
+    }
+    for (const t of [homeTeam, awayTeam]) {
+        for (const p of [...t.roster.forwards, ...t.roster.defensemen]) {
+            p.pointStreak = pointGetters.has(p.id) ? (p.pointStreak || 0) + 1 : 0;
+        }
+    }
+    if (homeGoalie) homeGoalie.winStreak = homeGoals > awayGoals ? (homeGoalie.winStreak || 0) + 1 : 0;
+    if (awayGoalie) awayGoalie.winStreak = awayGoals > homeGoals ? (awayGoalie.winStreak || 0) + 1 : 0;
+
+    // Rivalry game: winner takes +1 prestige (bragging rights).
+    const isRivalry = (homeTeam.rivals || []).includes(awayTeam.id) || (awayTeam.rivals || []).includes(homeTeam.id);
+    if (isRivalry) {
+        const winner = homeGoals > awayGoals ? homeTeam : awayGoals > homeGoals ? awayTeam : null;
+        if (winner) winner.prestige = Math.min(99, (winner.prestige || 0) + 1);
+    }
+    return isRivalry;
 }
 
 // Derives per-period shots and saves from a game's goal events.
@@ -673,6 +722,9 @@ export function simulateWeek(gameState) {
         };
     };
 
+    // Fresh weekly-awards tracking for this week's games.
+    gameState.weeklyTrack = {};
+
     weekGames.forEach(game => {
         if (game.played) return;
 
@@ -720,7 +772,7 @@ export function simulateWeek(gameState) {
         // Goal events feed season stats league-wide; the event objects are
         // kept only for the user's game (drives the game-day screen).
         const events = buildGameEvents(homeTeam, awayTeam, homeGoals, awayGoals, isOT);
-        accumulateGameStats(homeTeam, awayTeam, events);
+        if (accumulateGameStats(homeTeam, awayTeam, events, gameState)) game.rivalry = true;
         if (game.homeTeamId === gameState.teamId || game.awayTeamId === gameState.teamId) {
             game.events = events;
             game.shots = buildGameShots(homeTeam, awayTeam, events);
@@ -904,6 +956,37 @@ export function majorityRole(player) {
 // End-of-season player awards. Computes winners, applies +1 OVR each
 // (capped at 99), and stores the list for the season recap screen.
 // Idempotent — safe to call from the recap render.
+// Weekly awards: Forward / Defenseman / Goalie of the week from this week's
+// games. Winners get +1 OVR for the following week (eventBoost, league-wide
+// and symmetric). Skaters by points, goalies by SV% (min 15 shots).
+export function computeWeeklyAwards(gameState) {
+    const track = gameState.weeklyTrack || {};
+    const entries = Object.values(track).filter(e => e.player);
+    const awards = [];
+    const best = (pos, key) => {
+        let top = null;
+        for (const e of entries) {
+            if (e.pos !== pos || e[key] <= 0) continue;
+            if (!top || e[key] > top[key]) top = e;
+        }
+        return top;
+    };
+    const give = (entry, label, stat) => {
+        if (!entry) return;
+        entry.player.eventBoost = { ovr: 1, weeks: 1 };
+        awards.push({ label, name: entry.name, team: entry.team ? entry.team.name : '—', stat,
+            isUser: entry.team && entry.team.id === gameState.teamId });
+    };
+    const topF = best('F', 'pts'), topD = best('D', 'pts');
+    give(topF, 'Forward of the Week', `${topF ? topF.pts : 0} pts`);
+    give(topD, 'Defenseman of the Week', `${topD ? topD.pts : 0} pts`);
+    const gk = entries.filter(e => e.pos === 'G' && e.shots >= 15)
+        .sort((a, b) => (b.saves / b.shots) - (a.saves / a.shots))[0];
+    if (gk) give(gk, 'Goalie of the Week', `${(gk.saves / gk.shots * 100).toFixed(1)}% SV%`);
+    gameState.weeklyAwards = { week: gameState.currentWeek - 1, awards };
+    return awards;
+}
+
 export function computeSeasonAwards(gameState) {
     if (gameState.seasonAwards) return gameState.seasonAwards;
     const awards = [];

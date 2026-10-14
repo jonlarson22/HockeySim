@@ -3,13 +3,14 @@
 
 import { getState, update } from './store.js';
 import { showScreen } from './router.js';
-import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank } from './engine.js';
+import { simulateWeek, processOffSeason, enforceRosterLimits, generateSeasonSchedule, generatePlayer, nationalRank, computeWeeklyAwards } from './engine.js';
 import { gradeSeason, applySeasonConsequences, awardCoachXP, jobOffers, firedOpenings } from './career.js';
-import { generateProspectPool, assignPreferences, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS } from './recruiting.js';
+import { generateProspectPool, assignPreferences, processRecruitingWeek, processInseasonWeek, processRecruitWindow, applyPoolTurnover, INSEASON_WINDOW_WEEKS, MAX_RECRUIT_TARGETS, processRecruitVisit } from './recruiting.js';
 import { fillVacantSlots } from './lines.js';
 import { planTransferPortal, buildTransferPortal, processPortalSubmit } from './portal.js';
 import { conferences } from './data.js';
 import { maybeRollEvent, getEvent } from './events.js';
+import { evaluateSeasonGoals, applyGoalOutcomes } from './goals.js';
 
 // Simulates the current week for the whole league.
 // Returns { weekIndex, seasonActive }.
@@ -20,6 +21,15 @@ export function simCurrentWeek() {
         // Any unopened recruiting window expires when the next week sims.
         state.pendingRecruitWindow = null;
         seasonActive = simulateWeek(state);
+        // Weekly awards (regular season only): F/D/G of the week get +1 OVR
+        // for next week, league-wide.
+        if (weekIndex + 1 <= 28) computeWeeklyAwards(state);
+        // Recruit visit: a targeted prospect may attend a home game.
+        if (weekIndex + 1 <= 28) {
+            const myGame = (state.schedule[weekIndex] || []).find(g =>
+                g.homeTeamId === state.teamId || g.awayTeamId === state.teamId);
+            processRecruitVisit(state, myGame);
+        }
         // In-season recruiting background: lazy pool for migrated saves,
         // then the target-board drip + phantom rival creep.
         if (!state.prospectPool || !state.prospectPool.length) {
@@ -51,6 +61,13 @@ export function goAfterSimWeek(weekIndex, seasonActive) {
         return;
     }
     const myGame = (s.schedule[weekIndex] || []).find(g => g.homeTeamId === team.id || g.awayTeamId === team.id);
+    // Midseason report card: once, after the week-14 sim, before the replay.
+    if (weekIndex + 1 === 14 && !s.reportCardShown) {
+        update(st => { st.reportCardShown = true; });
+        showScreen('report-card', { weekIndex, confId: team.confId,
+            next: (myGame && myGame.events) ? 'game-day' : 'weekly-recap' });
+        return;
+    }
     if (myGame && myGame.events) showScreen('game-day', { weekIndex, confId: team.confId });
     else showScreen('weekly-recap', { weekIndex, confId: team.confId });
 }
@@ -146,6 +163,12 @@ export function resolveSeason() {
     update(state => {
         const team = state.leagueTeams.find(t => t.id === state.teamId);
         const grade = gradeSeason(state, team);
+        // Season goals nudge the grade: each met goal +1 step, each failed −1.
+        const goalResults = evaluateSeasonGoals(state, team);
+        grade.result = applyGoalOutcomes(grade.result, goalResults);
+        grade.goalResults = goalResults;
+        state.seasonGoalResults = goalResults;
+        state.lastSeasonWins = team ? team.wins || 0 : 0;
         state.coach.history.push({
             year: state.year,
             teamName: team ? team.name : '—',
@@ -292,6 +315,17 @@ function finalizeOffseason(state) {
     state.lastEventResult = null;
     state.eventsFired = [];
     state.recruitBonusPoints = 0;
+    state.seasonGoals = null;
+    state.seasonGoalResults = null;
+    state.seasonVisits = 0;
+    state.lastVisit = null;
+    state.lastVisitWeek = null;
+    state.reportCardShown = false;
+    for (const t of state.leagueTeams) {
+        for (const p of [...t.roster.forwards, ...t.roster.defensemen, ...t.roster.goalies]) {
+            p.pointStreak = 0; p.winStreak = 0;
+        }
+    }
     // Fresh class to court during the new season.
     state.prospectPool = generateProspectPool();
 }

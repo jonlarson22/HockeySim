@@ -298,3 +298,28 @@ export function applyPoolTurnover(pool) {
     }
     return replaced;
 }
+
+// Recruit visit weekends: on some home games, a random targeted prospect
+// attends. A win impresses them (+15 userPoints), a loss cools them (−10).
+// Max 3 visits per season. Returns the visit summary or null.
+export function processRecruitVisit(state, game) {
+    if (!game || !game.played) return null;
+    if (game.homeTeamId !== state.teamId) return null; // home games only
+    if ((state.seasonVisits || 0) >= 3) return null;
+    if (Math.random() > 0.35) return null;
+    const pool = (state.prospectPool || []).filter(p =>
+        (state.recruitTargets || []).includes(p.id) && !p.signedBy);
+    if (!pool.length) return null;
+    const prospect = pool[Math.floor(Math.random() * pool.length)];
+    const won = game.homeScore > game.awayScore;
+    const delta = won ? 15 : -10;
+    prospect.userPoints = Math.max(0, (prospect.userPoints || 0) + delta);
+    state.seasonVisits = (state.seasonVisits || 0) + 1;
+    const visit = {
+        name: `${prospect.firstName} ${prospect.lastName}`,
+        pos: prospect.position, stars: prospect.stars || 0, won, delta
+    };
+    state.lastVisit = visit;
+    state.lastVisitWeek = state.currentWeek - 1; // the week just simmed
+    return visit;
+}
